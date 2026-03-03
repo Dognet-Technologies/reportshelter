@@ -106,7 +106,7 @@ services:
     image: nginx:1.25-alpine
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "8088:80"
     volumes:
       - ./nginx/nginx.dev.conf:/etc/nginx/nginx.conf:ro
       - media_files:/app/media:ro
