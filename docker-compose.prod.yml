@@ -1,0 +1,58 @@
+version: "3.9"
+
+# Production overrides — use with:
+# docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.prod
+    volumes:
+      - media_files:/app/media
+      - quarantine_files:/app/quarantine
+      - static_files:/app/static
+    ports: []  # Not exposed directly; nginx proxies
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py collectstatic --noinput &&
+             daphne -b 0.0.0.0 -p 8000 config.asgi:application"
+
+  celery_worker:
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.prod
+    volumes:
+      - media_files:/app/media
+      - quarantine_files:/app/quarantine
+    command: celery -A config.celery worker --loglevel=warning --concurrency=4
+
+  celery_beat:
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.prod
+    command: celery -A config.celery beat --loglevel=warning --scheduler django_celery_beat.schedulers:DatabaseScheduler
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    volumes: []
+    ports: []  # Served via nginx
+
+  nginx:
+    volumes:
+      - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - media_files:/app/media:ro
+      - static_files:/app/static:ro
+    ports:
+      - "80:80"
+      - "443:443"
+
+volumes:
+  postgres_data:
+  redis_data:
+  media_files:
+  quarantine_files:
+  static_files:
