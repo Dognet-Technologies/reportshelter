@@ -16,7 +16,14 @@ class HasActiveLicense(BasePermission):
     message = "Your license has expired. Please renew to continue using this feature."
 
     def has_permission(self, request: Request, view: APIView) -> bool:
+        # Fast path: middleware already attached the license
         license_obj = getattr(request, "license", None)
         if license_obj is None:
-            return False
+            # Fallback: query the DB directly (e.g. force_authenticate in tests,
+            # or if the middleware hasn't run for some reason)
+            try:
+                license_obj = request.user.organization.license
+                license_obj.refresh_status()
+            except Exception:
+                return False
         return license_obj.is_active

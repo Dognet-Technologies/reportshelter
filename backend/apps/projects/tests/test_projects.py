@@ -127,11 +127,15 @@ class TestProjectCRUD:
         assert response.status_code == status.HTTP_201_CREATED
         assert response.data["title"] == "New Project"
 
-    def test_create_project_requires_active_license(self, org: Organization) -> None:
+    def test_create_project_requires_active_license(self, org: Organization, license_) -> None:
         """Project creation blocked when license is expired."""
-        # Expire the license
+        from datetime import timedelta
+        from django.utils import timezone
+        # Expire the license — must also set trial_expires_at to the past,
+        # otherwise refresh_status() will recompute it as TRIAL_ACTIVE.
         license_ = org.license
-        license_.status = License.Status.TRIAL_EXPIRED
+        license_.trial_expires_at = timezone.now() - timedelta(days=1)
+        license_.status = "trial_expired"
         license_.save()
 
         user = User.objects.create_user(

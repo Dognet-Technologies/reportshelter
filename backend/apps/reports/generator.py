@@ -120,7 +120,7 @@ class ReportGenerator:
             ET.SubElement(vuln_el, "remediation").text = v.remediation
 
         tree = ET.ElementTree(root)
-        buf = io.BytesIO()
+        buf = io.StringIO()
         tree.write(buf, encoding="unicode", xml_declaration=True)
         filename = self._make_filename("xml")
         self.export.file.save(filename, io.BytesIO(buf.getvalue().encode("utf-8")), save=False)

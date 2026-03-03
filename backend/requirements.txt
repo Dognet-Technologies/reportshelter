@@ -45,6 +45,7 @@ django-anymail==10.3
 
 # Utils
 python-decouple==3.8
+python-json-logger==2.0.7
 django-extensions==3.2.3
 django-storages==1.14.2
 

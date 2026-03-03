@@ -112,7 +112,8 @@ class ProjectDetailView(generics.RetrieveUpdateDestroyAPIView):
                 {"detail": lock_perm.message},
                 status=status.HTTP_423_LOCKED,
             )
-        return super().update(request, *args, partial=True, **kwargs)
+        kwargs["partial"] = True
+        return super().update(request, *args, **kwargs)
 
     def destroy(self, request: Request, *args, **kwargs) -> Response:
         if not request.user.is_org_admin:
@@ -188,7 +189,8 @@ class SubProjectDetailView(generics.RetrieveUpdateDestroyAPIView):
         return Response(SubProjectSerializer(instance).data)
 
     def update(self, request: Request, *args, **kwargs) -> Response:
-        return super().update(request, *args, partial=True, **kwargs)
+        kwargs["partial"] = True
+        return super().update(request, *args, **kwargs)
 
 
 # ---------------------------------------------------------------------------
@@ -239,7 +241,8 @@ class ScreenshotDetailView(generics.RetrieveUpdateDestroyAPIView):
         )
 
     def update(self, request: Request, *args, **kwargs) -> Response:
-        return super().update(request, *args, partial=True, **kwargs)
+        kwargs["partial"] = True
+        return super().update(request, *args, **kwargs)
 
 
 # ---------------------------------------------------------------------------

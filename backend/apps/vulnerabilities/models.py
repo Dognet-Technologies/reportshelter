@@ -6,7 +6,6 @@ diff/timeline logic, and ScanImport tracking.
 
 from __future__ import annotations
 
-from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.utils import timezone
 
@@ -138,8 +137,7 @@ class Vulnerability(models.Model):
     vuln_status = models.CharField(max_length=16, choices=VulnStatus.choices, default=VulnStatus.OPEN)
 
     # Deduplication
-    sources = ArrayField(
-        models.CharField(max_length=32),
+    sources = models.JSONField(
         default=list,
         help_text="Tools that identified this vulnerability (after dedup)",
     )
