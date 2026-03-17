@@ -1,18 +1,18 @@
 """
-Client for the Digital License Manager (DLM) WordPress plugin.
+HTTP client for the Digital License Manager (DLM) WordPress plugin.
 
-Configurazione richiesta (variabili d'ambiente):
-    WP_LICENSE_API_URL=https://your-wordpress-site.com/wp-json/dlm/v1
-    WP_LICENSE_API_KEY=<consumer_key>
-    WP_LICENSE_API_SECRET=<consumer_secret>
-
-Endpoints utilizzati:
-    - GET  /licenses/{license_key}              → validate / get info
-    - GET  /licenses/activate/{license_key}     → activate for an instance
-    - GET  /licenses/deactivate/{license_key}   → deactivate for an instance
-
-Autenticazione:
+Authentication (HTTP Basic Auth variant documented by DLM):
     Authorization: Bearer base64(consumer_key:consumer_secret)
+
+Endpoints used:
+    GET /licenses/{key}              — validate / get info
+    GET /licenses/activate/{key}     — activate for an instance
+    GET /licenses/deactivate/{key}   — deactivate for an instance
+
+Configuration via environment variables:
+    WP_LICENSE_API_URL    — e.g. https://dognet.tech/wp-json/dlm/v1
+    WP_LICENSE_API_KEY    — consumer key  (ck_…)
+    WP_LICENSE_API_SECRET — consumer secret (cs_…)
 """
 
 import base64
@@ -25,22 +25,30 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-# DLM status codes (integers returned by the plugin)
-_DLM_STATUS_MAP = {
+# DLM integer status codes → normalised strings
+_DLM_STATUS_MAP: dict[int, str] = {
     1: "inactive",
     2: "active",
     3: "expired",
     4: "disabled",
 }
 
+# API base path segments — assembled at call time to avoid a single
+# plaintext string that trivially reveals the full endpoint structure.
+_SEG: tuple[bytes, ...] = (
+    b"licenses",
+    b"activate",
+    b"deactivate",
+)
+
 
 @dataclass
 class LicenseInfo:
-    """Normalized response from the DLM API."""
+    """Normalised response from a DLM API call."""
 
     key: str
-    status: str          # "active" | "inactive" | "expired" | "disabled"
-    expires_at: Optional[str]  # "YYYY-MM-DD HH:MM:SS" or None
+    status: str                    # "active" | "inactive" | "expired" | "disabled"
+    expires_at: Optional[str]      # "YYYY-MM-DD HH:MM:SS" or None
     activations_limit: Optional[int]
     activations_count: int
 
@@ -53,20 +61,15 @@ class WPLicenseClient:
     """
     HTTP client for the Digital License Manager WordPress plugin.
 
-    Reads configuration from environment variables:
-        WP_LICENSE_API_URL    — base URL, e.g. https://dognet.tech/wp-json/dlm/v1
-        WP_LICENSE_API_KEY    — consumer key  (ck_…)
-        WP_LICENSE_API_SECRET — consumer secret (cs_…)
-
-    Authentication follows the HTTP Basic Auth variant documented by DLM:
-        Authorization: Bearer base64(consumer_key:consumer_secret)
+    All credentials are read from environment variables at instantiation time;
+    nothing sensitive is stored as a class-level constant.
     """
 
     _TIMEOUT = 10  # seconds
 
     def __init__(self) -> None:
-        self._api_url = os.environ.get("WP_LICENSE_API_URL", "").rstrip("/")
-        self._api_key = os.environ.get("WP_LICENSE_API_KEY", "")
+        self._api_url  = os.environ.get("WP_LICENSE_API_URL",    "").rstrip("/")
+        self._api_key  = os.environ.get("WP_LICENSE_API_KEY",    "")
         self._api_secret = os.environ.get("WP_LICENSE_API_SECRET", "")
         self._configured = bool(self._api_url and self._api_key and self._api_secret)
 
@@ -75,8 +78,8 @@ class WPLicenseClient:
     # ------------------------------------------------------------------
 
     @property
-    def _auth_header(self) -> dict:
-        """Return the Authorization header expected by DLM."""
+    def _auth_header(self) -> dict[str, str]:
+        """Return Authorization header: Bearer base64(key:secret)."""
         token = base64.b64encode(
             f"{self._api_key}:{self._api_secret}".encode()
         ).decode()
@@ -84,42 +87,40 @@ class WPLicenseClient:
 
     def _get(self, path: str, params: Optional[dict] = None) -> dict:
         """
-        Perform a GET request against the DLM API.
-
-        Args:
-            path:   URL path relative to the API base URL.
-            params: Optional query string parameters.
-
-        Returns:
-            The parsed JSON response body as a dict.
+        Perform an authenticated GET against the DLM API.
 
         Raises:
-            WPLicenseClientError: On HTTP errors or unexpected response format.
+            WPLicenseClientError: on HTTP error, network failure, or
+                                  ``success: false`` in the JSON body.
         """
         url = f"{self._api_url}/{path.lstrip('/')}"
         try:
-            response = requests.get(
+            resp = requests.get(
                 url,
                 headers=self._auth_header,
                 params=params,
                 timeout=self._TIMEOUT,
             )
         except requests.RequestException as exc:
-            raise WPLicenseClientError(f"Network error contacting DLM API: {exc}") from exc
-
-        if not response.ok:
-            try:
-                detail = response.json()
-            except Exception:
-                detail = response.text
             raise WPLicenseClientError(
-                f"DLM API returned HTTP {response.status_code}: {detail}"
+                f"Network error contacting DLM API: {exc}"
+            ) from exc
+
+        if not resp.ok:
+            try:
+                detail = resp.json()
+            except Exception:
+                detail = resp.text
+            raise WPLicenseClientError(
+                f"DLM API returned HTTP {resp.status_code}: {detail}"
             )
 
         try:
-            body = response.json()
+            body = resp.json()
         except Exception as exc:
-            raise WPLicenseClientError(f"Invalid JSON from DLM API: {exc}") from exc
+            raise WPLicenseClientError(
+                f"Invalid JSON from DLM API: {exc}"
+            ) from exc
 
         if not body.get("success"):
             raise WPLicenseClientError(
@@ -129,33 +130,35 @@ class WPLicenseClient:
         return body
 
     @staticmethod
-    def _parse_license_info(data: dict) -> LicenseInfo:
+    def _parse(data: dict, expected_key: str) -> LicenseInfo:
         """
-        Convert a DLM API ``data`` object to a :class:`LicenseInfo`.
+        Convert a DLM ``data`` object into :class:`LicenseInfo`.
 
-        Args:
-            data: The ``data`` dict from the DLM JSON response.
-
-        Returns:
-            A populated :class:`LicenseInfo` instance.
+        Also verifies that the returned ``licenseKey`` matches ``expected_key``
+        to guard against response-substitution.
         """
+        returned_key: str = data.get("licenseKey", "")
+        if returned_key and returned_key.upper() != expected_key.upper():
+            raise WPLicenseClientError(
+                "DLM response licenseKey mismatch — possible response substitution."
+            )
+
         status_code = data.get("status")
-        status_str = _DLM_STATUS_MAP.get(status_code, "unknown")
+        status_str  = _DLM_STATUS_MAP.get(status_code, "unknown")
 
         return LicenseInfo(
-            key=data.get("licenseKey", ""),
+            key=returned_key or expected_key,
             status=status_str,
-            expires_at=data.get("expiresAt"),  # "YYYY-MM-DD HH:MM:SS" or None
+            expires_at=data.get("expiresAt"),
             activations_limit=data.get("activationsLimit"),
             activations_count=data.get("timesActivated", 0),
         )
 
     def _require_configured(self) -> None:
-        """Raise :exc:`NotImplementedError` if env vars are missing."""
         if not self._configured:
             raise NotImplementedError(
-                "Configure WP_LICENSE_API_URL, WP_LICENSE_API_KEY, and WP_LICENSE_API_SECRET "
-                "to enable DLM license management."
+                "Configure WP_LICENSE_API_URL, WP_LICENSE_API_KEY, and "
+                "WP_LICENSE_API_SECRET to enable DLM license management."
             )
 
     # ------------------------------------------------------------------
@@ -164,73 +167,52 @@ class WPLicenseClient:
 
     def validate_license(self, license_key: str) -> LicenseInfo:
         """
-        Retrieve current status and metadata for a license key.
+        Retrieve current status and metadata for *license_key*.
 
         Calls ``GET /licenses/{license_key}``.
 
-        Args:
-            license_key: The license key to validate (e.g. ``RS-XXXX-XXXX-XXXX-XXXX``).
-
-        Returns:
-            :class:`LicenseInfo` with current status and expiry.
-
         Raises:
-            WPLicenseClientError: If the API call fails or returns an error.
-            NotImplementedError: If env vars are not configured.
+            WPLicenseClientError: on API/network error.
+            NotImplementedError:  if env vars are not configured.
         """
         self._require_configured()
-        logger.debug("Validating license key %s…", license_key[:8])
-        body = self._get(f"licenses/{license_key}")
-        return self._parse_license_info(body["data"])
+        logger.debug("Validating key %s…", license_key[:8])
+        seg = _SEG[0].decode()
+        body = self._get(f"{seg}/{license_key}")
+        return self._parse(body["data"], license_key)
 
     def activate_license(self, license_key: str, instance_id: str) -> LicenseInfo:
         """
-        Activate a license key for a specific installation instance.
+        Activate *license_key* for *instance_id* (organisation UUID).
 
-        Calls ``GET /licenses/activate/{license_key}`` with ``instanceId`` as
-        a query parameter so the activation is tied to this organisation.
-
-        Args:
-            license_key: The license key to activate.
-            instance_id: Unique identifier for this installation (organisation UUID).
-
-        Returns:
-            :class:`LicenseInfo` with updated activation count and expiry.
+        Calls ``GET /licenses/activate/{license_key}?instanceId=…``.
 
         Raises:
-            WPLicenseClientError: If the API call fails or the key is invalid/expired.
-            NotImplementedError: If env vars are not configured.
+            WPLicenseClientError: if the key is invalid, exhausted, or the
+                                  API returns an error.
+            NotImplementedError:  if env vars are not configured.
         """
         self._require_configured()
-        logger.info("Activating license key %s for instance %s", license_key[:8], instance_id)
-        body = self._get(
-            f"licenses/activate/{license_key}",
-            params={"instanceId": instance_id},
-        )
-        return self._parse_license_info(body["data"])
+        logger.info("Activating key %s for instance %s", license_key[:8], instance_id)
+        seg = f"{_SEG[0].decode()}/{_SEG[1].decode()}"
+        body = self._get(f"{seg}/{license_key}", params={"instanceId": instance_id})
+        return self._parse(body["data"], license_key)
 
     def deactivate_license(self, license_key: str, instance_id: str) -> bool:
         """
-        Deactivate a license key for a specific installation instance.
+        Deactivate *license_key* for *instance_id*.
 
-        Calls ``GET /licenses/deactivate/{license_key}`` with ``instanceId``
-        as a query parameter.
-
-        Args:
-            license_key: The license key to deactivate.
-            instance_id: The instance ID previously used during activation.
+        Calls ``GET /licenses/deactivate/{license_key}?instanceId=…``.
 
         Returns:
-            ``True`` if deactivated successfully.
+            True if deactivated successfully.
 
         Raises:
-            WPLicenseClientError: If the API call fails.
-            NotImplementedError: If env vars are not configured.
+            WPLicenseClientError: on API/network error.
+            NotImplementedError:  if env vars are not configured.
         """
         self._require_configured()
-        logger.info("Deactivating license key %s for instance %s", license_key[:8], instance_id)
-        self._get(
-            f"licenses/deactivate/{license_key}",
-            params={"instanceId": instance_id},
-        )
+        logger.info("Deactivating key %s for instance %s", license_key[:8], instance_id)
+        seg = f"{_SEG[0].decode()}/{_SEG[2].decode()}"
+        self._get(f"{seg}/{license_key}", params={"instanceId": instance_id})
         return True
