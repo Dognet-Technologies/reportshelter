@@ -111,16 +111,24 @@ class WPLicenseClient:
         """
         Perform an authenticated GET against the DLM API.
 
+        Credentials are sent as query parameters (consumer_key / consumer_secret)
+        since WordPress/Apache installations often strip the Authorization header.
+
         Raises:
             WPLicenseClientError: on HTTP error, network failure, or
                                   ``success: false`` in the JSON body.
         """
         url = f"{self._api_url}/{path.lstrip('/')}"
+        auth_params: dict = {
+            "consumer_key": self._api_key,
+            "consumer_secret": self._api_secret,
+        }
+        if params:
+            auth_params.update(params)
         try:
             resp = requests.get(
                 url,
-                headers=self._auth_header,
-                params=params,
+                params=auth_params,
                 timeout=self._TIMEOUT,
             )
         except requests.RequestException as exc:
