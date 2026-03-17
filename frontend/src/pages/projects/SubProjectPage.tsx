@@ -106,7 +106,7 @@ function ScanImportSection({ subprojectId, canImport }: ScanImportSectionProps) 
       if (!file) return;
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("scanner_type", scannerType);
+      formData.append("tool", scannerType);
       try {
         const result = await upload.mutateAsync(formData);
         setRecentImports((prev) => [result.id, ...prev]);
