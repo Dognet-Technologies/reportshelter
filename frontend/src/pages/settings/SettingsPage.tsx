@@ -258,8 +258,16 @@ function OrganizationSection() {
 
 // ─── License Section ──────────────────────────────────────────────────────────
 
+const LICENSE_KEY_RE = /^RS-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/i;
+
 const licenseSchema = z.object({
-  license_key: z.string().min(6, "Enter a valid license key"),
+  license_key: z
+    .string()
+    .min(1, "License key is required")
+    .transform((v) => v.trim().toUpperCase())
+    .refine((v) => LICENSE_KEY_RE.test(v), {
+      message: "Invalid format — expected RS-XXXX-XXXX-XXXX-XXXX",
+    }),
 });
 
 type LicenseFormData = z.infer<typeof licenseSchema>;
@@ -406,14 +414,13 @@ function LicenseSection() {
           Activate PRO License
         </h3>
         <p className="text-sm text-slate-500 mb-4">
-          Enter your license key to activate PRO features. You can purchase a license at{" "}
+          Enter your license key to activate PRO features. To purchase a license or for
+          custom requirements contact{" "}
           <a
-            href="https://cyberreportpro.com"
-            target="_blank"
-            rel="noopener noreferrer"
+            href="mailto:sales@dognet-technologies.online"
             className="text-blue-400 hover:text-blue-300"
           >
-            cyberreportpro.com
+            sales@dognet-technologies.online
           </a>
           .
         </p>
@@ -422,7 +429,7 @@ function LicenseSection() {
             <input
               {...register("license_key")}
               className="input font-mono"
-              placeholder="XXXX-XXXX-XXXX-XXXX"
+              placeholder="RS-XXXX-XXXX-XXXX-XXXX"
             />
             {errors.license_key && (
               <p className="mt-1 text-xs text-red-400">{errors.license_key.message}</p>
