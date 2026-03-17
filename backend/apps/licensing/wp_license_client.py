@@ -9,10 +9,9 @@ Endpoints used:
     GET /licenses/activate/{key}     — activate for an instance
     GET /licenses/deactivate/{key}   — deactivate for an instance
 
-Configuration via environment variables:
-    WP_LICENSE_API_URL    — e.g. https://dognet.tech/wp-json/dlm/v1
-    WP_LICENSE_API_KEY    — consumer key  (ck_…)
-    WP_LICENSE_API_SECRET — consumer secret (cs_…)
+The API URL is read from WP_LICENSE_API_URL (env) with a built-in default.
+Application credentials (consumer key / secret) are embedded — they are
+NOT customer-configurable and must not appear in the customer's .env.
 """
 
 import base64
@@ -41,6 +40,26 @@ _SEG: tuple[bytes, ...] = (
     b"deactivate",
 )
 
+# Application credentials (owner-side — not customer-configurable).
+# Split into byte fragments to avoid trivial grep/string extraction.
+_K: tuple[bytes, ...] = (
+    b"ck_191d", b"e0ac583", b"4b9adb4",
+    b"3b7523e", b"eaafbf6", b"a35c789c",
+)
+_S: tuple[bytes, ...] = (
+    b"cs_ce1b", b"8f824c6", b"c2e2a04",
+    b"3b3356a", b"c95b125", b"3703a1b5",
+)
+_U: tuple[bytes, ...] = (
+    b"https://dognet", b".tech/wp-json",
+    b"/dlm/v1",
+)
+
+
+def _assemble(parts: tuple[bytes, ...]) -> str:
+    """Join byte fragments into a plain string."""
+    return b"".join(parts).decode()
+
 
 @dataclass
 class LicenseInfo:
@@ -61,16 +80,19 @@ class WPLicenseClient:
     """
     HTTP client for the Digital License Manager WordPress plugin.
 
-    All credentials are read from environment variables at instantiation time;
-    nothing sensitive is stored as a class-level constant.
+    The API URL can be overridden via WP_LICENSE_API_URL for development.
+    Application credentials are embedded and cannot be overridden via env.
     """
 
     _TIMEOUT = 10  # seconds
 
     def __init__(self) -> None:
-        self._api_url  = os.environ.get("WP_LICENSE_API_URL",    "").rstrip("/")
-        self._api_key  = os.environ.get("WP_LICENSE_API_KEY",    "")
-        self._api_secret = os.environ.get("WP_LICENSE_API_SECRET", "")
+        self._api_url = os.environ.get(
+            "WP_LICENSE_API_URL", _assemble(_U)
+        ).rstrip("/")
+        # Application-level credentials — embedded, not customer-supplied.
+        self._api_key    = _assemble(_K)
+        self._api_secret = _assemble(_S)
         self._configured = bool(self._api_url and self._api_key and self._api_secret)
 
     # ------------------------------------------------------------------
@@ -157,8 +179,7 @@ class WPLicenseClient:
     def _require_configured(self) -> None:
         if not self._configured:
             raise NotImplementedError(
-                "Configure WP_LICENSE_API_URL, WP_LICENSE_API_KEY, and "
-                "WP_LICENSE_API_SECRET to enable DLM license management."
+                "WP_LICENSE_API_URL is not set."
             )
 
     # ------------------------------------------------------------------
@@ -173,7 +194,7 @@ class WPLicenseClient:
 
         Raises:
             WPLicenseClientError: on API/network error.
-            NotImplementedError:  if env vars are not configured.
+            NotImplementedError:  if API URL is not configured.
         """
         self._require_configured()
         logger.debug("Validating key %s…", license_key[:8])
@@ -190,7 +211,7 @@ class WPLicenseClient:
         Raises:
             WPLicenseClientError: if the key is invalid, exhausted, or the
                                   API returns an error.
-            NotImplementedError:  if env vars are not configured.
+            NotImplementedError:  if API URL is not configured.
         """
         self._require_configured()
         logger.info("Activating key %s for instance %s", license_key[:8], instance_id)
@@ -209,7 +230,7 @@ class WPLicenseClient:
 
         Raises:
             WPLicenseClientError: on API/network error.
-            NotImplementedError:  if env vars are not configured.
+            NotImplementedError:  if API URL is not configured.
         """
         self._require_configured()
         logger.info("Deactivating key %s for instance %s", license_key[:8], instance_id)
