@@ -32,7 +32,7 @@ weasyprint==68.0
 reportlab==4.1.0
 
 # Templating
-Jinja2==3.1.4
+Jinja2==3.1.6
 
 # Charts & data
 matplotlib==3.8.4
