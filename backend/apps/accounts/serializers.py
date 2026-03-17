@@ -50,10 +50,11 @@ class UserSerializer(serializers.ModelSerializer):
             "role",
             "organization_id",
             "is_email_verified",
+            "must_change_password",
             "date_joined",
             "last_login",
         ]
-        read_only_fields = ["id", "email", "organization_id", "is_email_verified", "date_joined", "last_login"]
+        read_only_fields = ["id", "email", "organization_id", "is_email_verified", "must_change_password", "date_joined", "last_login"]
 
 
 class RegisterSerializer(serializers.Serializer):

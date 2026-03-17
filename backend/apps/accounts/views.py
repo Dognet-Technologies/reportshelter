@@ -67,19 +67,6 @@ def _is_locked_out(email: str) -> bool:
     return recent_failures >= max_attempts
 
 
-def _send_verification_email(user: User, token: EmailVerificationToken) -> None:
-    """Send email address verification link."""
-    frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173")
-    verify_url = f"{frontend_url}/verify-email?token={token.token}"
-    send_mail(
-        subject="Verify your CyberReport Pro email",
-        message=f"Hi {user.first_name or user.email},\n\nVerify your email: {verify_url}\n\nThis link expires in 24 hours.",
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=[user.email],
-        fail_silently=True,
-    )
-
-
 def _send_password_reset_email(user: User, token: PasswordResetToken) -> None:
     """Send password reset link."""
     frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173")
@@ -112,10 +99,6 @@ class RegisterView(APIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
 
-        # Create and send verification token
-        token = EmailVerificationToken.objects.create(user=user)
-        _send_verification_email(user, token)
-
         AuditLog.log(
             action=AuditLog.Action.USER_REGISTERED,
             user=user,
@@ -129,7 +112,7 @@ class RegisterView(APIView):
         return Response(
             {
                 "success": True,
-                "message": "Registration successful. Please check your email to verify your account.",
+                "message": "Registration successful. You can now log in.",
                 "user": UserSerializer(user).data,
             },
             status=status.HTTP_201_CREATED,
@@ -224,6 +207,7 @@ class LoginView(APIView):
                 "access": str(access),
                 "refresh": str(refresh),
                 "user": UserSerializer(user).data,
+                "must_change_password": user.must_change_password,
             }
         )
 
@@ -281,7 +265,8 @@ class PasswordChangeView(APIView):
             )
 
         user.set_password(serializer.validated_data["new_password"])
-        user.save(update_fields=["password"])
+        user.must_change_password = False
+        user.save(update_fields=["password", "must_change_password"])
 
         AuditLog.log(
             action=AuditLog.Action.PASSWORD_RESET,

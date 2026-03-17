@@ -1,61 +1,61 @@
 # Django core
-Django==5.0.4
-djangorestframework==3.15.1
-django-cors-headers==4.3.1
-django-filter==24.2
+Django==5.1.8
+djangorestframework==3.15.2
+django-cors-headers==4.6.0
+django-filter==24.3
 
 # Authentication & Security
-djangorestframework-simplejwt==5.3.1
+djangorestframework-simplejwt==5.4.0
 argon2-cffi==23.1.0
 django-ratelimit==4.1.0
 
 # Database
-psycopg2-binary==2.9.9
+psycopg2-binary==2.9.10
 
 # Async / WebSocket
-daphne==4.1.0
-channels==4.1.0
-channels-redis==4.2.0
+daphne==4.1.2
+channels==4.2.0
+channels-redis==4.2.1
 
 # Task queue
-celery==5.3.6
-redis==5.0.3
-django-celery-beat==2.6.0
+celery==5.4.0
+redis==5.2.1
+django-celery-beat==2.7.0
 django-celery-results==2.5.1
 
 # File processing & validation
 python-magic==0.4.27
-pillow==10.3.0
+pillow==11.1.0
 
 # PDF generation
-weasyprint==61.2
-reportlab==4.1.0
+weasyprint==62.3
+reportlab==4.2.5
 
 # Templating
-Jinja2==3.1.4
+Jinja2==3.1.6
 
 # Charts & data
-matplotlib==3.8.4
-plotly==5.21.0
-pandas==2.2.1
+matplotlib==3.10.1
+plotly==5.24.1
+pandas==2.2.3
 kaleido==0.2.1  # Plotly static image export
 
 # Email
-django-anymail==10.3
+django-anymail==12.0
 
 # Utils
 python-decouple==3.8
-python-json-logger==2.0.7
+python-json-logger==3.2.1
 django-extensions==3.2.3
-django-storages==1.14.2
+django-storages==1.14.6
 
 # Testing
-pytest==8.1.1
-pytest-django==4.8.0
-pytest-cov==5.0.0
-factory-boy==3.3.0
+pytest==8.3.5
+pytest-django==4.9.0
+pytest-cov==6.0.0
+factory-boy==3.3.1
 
 # Dev tools
-black==24.3.0
+black==25.1.0
 isort==5.13.2
-flake8==7.0.0
+flake8==7.1.2
