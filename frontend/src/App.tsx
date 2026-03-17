@@ -17,12 +17,9 @@ import ReportBuilderPage from "@/pages/reports/ReportBuilderPage";
 import SettingsPage from "@/pages/settings/SettingsPage";
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, user } = useAuthStore((s) => ({
-    isAuthenticated: s.isAuthenticated,
-    user: s.user,
-  }));
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const user = useAuthStore((s) => s.user);
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  // Force password change before accessing any other page
   if (user?.must_change_password) return <Navigate to="/change-password" replace />;
   return <>{children}</>;
 }
