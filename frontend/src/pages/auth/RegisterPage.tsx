@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Link, useNavigate } from "react-router-dom";
 import { ShieldCheck, Loader2, Eye, EyeOff } from "lucide-react";
-import { useState } from "react";
+import { forwardRef, useState, type InputHTMLAttributes } from "react";
 import toast from "react-hot-toast";
 import { apiClient } from "@/api/client";
 
@@ -29,6 +29,32 @@ const registerSchema = z
   });
 
 type RegisterFormData = z.infer<typeof registerSchema>;
+
+const Field = forwardRef<
+  HTMLInputElement,
+  InputHTMLAttributes<HTMLInputElement> & {
+    id: string;
+    label: string;
+    error?: string;
+  }
+>(function Field({ id, label, type = "text", placeholder, error, ...props }, ref) {
+  return (
+    <div>
+      <label htmlFor={id} className="label">
+        {label}
+      </label>
+      <input
+        {...props}
+        ref={ref}
+        id={id}
+        type={type}
+        placeholder={placeholder}
+        className="input"
+      />
+      {error && <p className="mt-1 text-xs text-red-400">{error}</p>}
+    </div>
+  );
+});
 
 export default function RegisterPage() {
   const navigate = useNavigate();
@@ -77,35 +103,6 @@ export default function RegisterPage() {
         setError("root", { message: "Registration failed. Please try again." });
       }
     }
-  }
-
-  function Field({
-    id,
-    label,
-    type = "text",
-    placeholder,
-    error,
-    ...props
-  }: React.InputHTMLAttributes<HTMLInputElement> & {
-    id: string;
-    label: string;
-    error?: string;
-  }) {
-    return (
-      <div>
-        <label htmlFor={id} className="label">
-          {label}
-        </label>
-        <input
-          {...props}
-          id={id}
-          type={type}
-          placeholder={placeholder}
-          className="input"
-        />
-        {error && <p className="mt-1 text-xs text-red-400">{error}</p>}
-      </div>
-    );
   }
 
   return (
