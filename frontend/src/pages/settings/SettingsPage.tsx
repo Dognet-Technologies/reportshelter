@@ -14,6 +14,10 @@ import {
   AlertCircle,
   Clock,
   Key,
+  User,
+  Lock,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -21,13 +25,272 @@ import { z } from "zod";
 import { format } from "date-fns";
 import toast from "react-hot-toast";
 import {
+  useMe,
+  useUpdateMe,
+  useChangePassword,
   useOrganization,
   useUpdateOrganization,
   useLicenseStatus,
   useActivateLicense,
 } from "@/api/hooks";
 import { Layout } from "@/components/Layout";
+import { useAuthStore } from "@/store/authStore";
 import type { LicenseStatusCode } from "@/api/types";
+
+// ─── Profile Section ──────────────────────────────────────────────────────────
+
+const profileSchema = z.object({
+  first_name: z.string().min(1, "First name is required"),
+  last_name: z.string().min(1, "Last name is required"),
+  email: z.string().email("Enter a valid email address"),
+});
+
+type ProfileFormData = z.infer<typeof profileSchema>;
+
+const passwordSchema = z
+  .object({
+    current_password: z.string().min(1, "Current password is required"),
+    new_password: z
+      .string()
+      .min(12, "Password must be at least 12 characters")
+      .regex(/[A-Z]/, "Must contain at least one uppercase letter")
+      .regex(/[0-9]/, "Must contain at least one number"),
+    confirm_password: z.string().min(1, "Please confirm your password"),
+  })
+  .refine((d) => d.new_password === d.confirm_password, {
+    message: "Passwords do not match",
+    path: ["confirm_password"],
+  });
+
+type PasswordFormData = z.infer<typeof passwordSchema>;
+
+function ProfileSection() {
+  const { data: me, isLoading } = useMe();
+  const updateMe = useUpdateMe();
+  const changePassword = useChangePassword();
+  const { setUser } = useAuthStore();
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  const {
+    register: regProfile,
+    handleSubmit: handleProfile,
+    formState: { errors: profileErrors, isSubmitting: profileSubmitting, isDirty: profileDirty },
+    reset: resetProfile,
+  } = useForm<ProfileFormData>({
+    resolver: zodResolver(profileSchema),
+    values: me
+      ? { first_name: me.first_name, last_name: me.last_name, email: me.email }
+      : undefined,
+  });
+
+  const {
+    register: regPwd,
+    handleSubmit: handlePwd,
+    formState: { errors: pwdErrors, isSubmitting: pwdSubmitting },
+    reset: resetPwd,
+    setError: setPwdError,
+  } = useForm<PasswordFormData>({ resolver: zodResolver(passwordSchema) });
+
+  async function onSaveProfile(data: ProfileFormData) {
+    try {
+      const updated = await updateMe.mutateAsync(data);
+      setUser(updated);
+      toast.success("Profile updated.");
+      resetProfile(data);
+    } catch {
+      toast.error("Failed to update profile.");
+    }
+  }
+
+  async function onChangePassword(data: PasswordFormData) {
+    try {
+      await changePassword.mutateAsync(data);
+      toast.success("Password changed successfully.");
+      resetPwd();
+    } catch (err: unknown) {
+      const axiosErr = err as {
+        response?: { data?: { errors?: Record<string, string[]>; error?: string } };
+      };
+      const fieldErrors = axiosErr.response?.data?.errors;
+      if (fieldErrors) {
+        Object.entries(fieldErrors).forEach(([field, messages]) => {
+          setPwdError(field as keyof PasswordFormData, { message: messages[0] });
+        });
+      } else {
+        setPwdError("root", {
+          message: axiosErr.response?.data?.error ?? "Failed to change password.",
+        });
+      }
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-8 text-slate-500">
+        <Loader2 className="h-5 w-5 animate-spin mr-2" />
+        Loading…
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Personal info */}
+      <form onSubmit={handleProfile(onSaveProfile)} className="card space-y-4">
+        <h3 className="font-semibold text-slate-100 flex items-center gap-2">
+          <User className="h-4 w-4" />
+          Personal Information
+        </h3>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="label">First name</label>
+            <input {...regProfile("first_name")} className="input" />
+            {profileErrors.first_name && (
+              <p className="mt-1 text-xs text-red-400">{profileErrors.first_name.message}</p>
+            )}
+          </div>
+          <div>
+            <label className="label">Last name</label>
+            <input {...regProfile("last_name")} className="input" />
+            {profileErrors.last_name && (
+              <p className="mt-1 text-xs text-red-400">{profileErrors.last_name.message}</p>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <label className="label">Email address</label>
+          <input {...regProfile("email")} type="email" className="input" />
+          {profileErrors.email && (
+            <p className="mt-1 text-xs text-red-400">{profileErrors.email.message}</p>
+          )}
+          <p className="mt-1 text-xs text-slate-500">
+            Changing your email will require re-verification.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button
+            type="submit"
+            disabled={profileSubmitting || !profileDirty}
+            className="btn-primary"
+          >
+            {profileSubmitting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )}
+            Save Profile
+          </button>
+          {profileDirty && (
+            <span className="text-xs text-amber-400">You have unsaved changes</span>
+          )}
+        </div>
+      </form>
+
+      {/* Change password */}
+      <form onSubmit={handlePwd(onChangePassword)} className="card space-y-4">
+        <h3 className="font-semibold text-slate-100 flex items-center gap-2">
+          <Lock className="h-4 w-4" />
+          Change Password
+        </h3>
+
+        {pwdErrors.root && (
+          <div className="rounded-md border border-red-700 bg-red-950 px-4 py-3 text-sm text-red-300">
+            {pwdErrors.root.message}
+          </div>
+        )}
+
+        <div>
+          <label className="label">Current password</label>
+          <div className="relative">
+            <input
+              {...regPwd("current_password")}
+              type={showCurrent ? "text" : "password"}
+              autoComplete="current-password"
+              className="input pr-10"
+              placeholder="••••••••"
+            />
+            <button
+              type="button"
+              onClick={() => setShowCurrent((v) => !v)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+              aria-label={showCurrent ? "Hide" : "Show"}
+            >
+              {showCurrent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
+          {pwdErrors.current_password && (
+            <p className="mt-1 text-xs text-red-400">{pwdErrors.current_password.message}</p>
+          )}
+        </div>
+
+        <div>
+          <label className="label">New password</label>
+          <div className="relative">
+            <input
+              {...regPwd("new_password")}
+              type={showNew ? "text" : "password"}
+              autoComplete="new-password"
+              className="input pr-10"
+              placeholder="Min. 12 characters"
+            />
+            <button
+              type="button"
+              onClick={() => setShowNew((v) => !v)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+              aria-label={showNew ? "Hide" : "Show"}
+            >
+              {showNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
+          {pwdErrors.new_password && (
+            <p className="mt-1 text-xs text-red-400">{pwdErrors.new_password.message}</p>
+          )}
+          <p className="mt-1 text-xs text-slate-500">
+            At least 12 characters, one uppercase letter, one number.
+          </p>
+        </div>
+
+        <div>
+          <label className="label">Confirm new password</label>
+          <div className="relative">
+            <input
+              {...regPwd("confirm_password")}
+              type={showConfirm ? "text" : "password"}
+              autoComplete="new-password"
+              className="input pr-10"
+              placeholder="••••••••"
+            />
+            <button
+              type="button"
+              onClick={() => setShowConfirm((v) => !v)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+              aria-label={showConfirm ? "Hide" : "Show"}
+            >
+              {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
+          {pwdErrors.confirm_password && (
+            <p className="mt-1 text-xs text-red-400">{pwdErrors.confirm_password.message}</p>
+          )}
+        </div>
+
+        <button type="submit" disabled={pwdSubmitting} className="btn-primary">
+          {pwdSubmitting ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Lock className="h-4 w-4" />
+          )}
+          Change Password
+        </button>
+      </form>
+    </div>
+  );
+}
 
 // ─── Organization Form ────────────────────────────────────────────────────────
 
@@ -453,12 +716,13 @@ function LicenseSection() {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-type SettingsTab = "organization" | "license";
+type SettingsTab = "profile" | "organization" | "license";
 
 export default function SettingsPage() {
-  const [tab, setTab] = useState<SettingsTab>("organization");
+  const [tab, setTab] = useState<SettingsTab>("profile");
 
   const TABS: { key: SettingsTab; label: string; icon: React.ReactNode }[] = [
+    { key: "profile", label: "Profile", icon: <User className="h-4 w-4" /> },
     { key: "organization", label: "Organization", icon: <Building2 className="h-4 w-4" /> },
     { key: "license", label: "License", icon: <Shield className="h-4 w-4" /> },
   ];
@@ -468,7 +732,7 @@ export default function SettingsPage() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-100">Settings</h1>
         <p className="text-slate-400 text-sm mt-1">
-          Manage your organization profile and license.
+          Manage your profile, organization and license.
         </p>
       </div>
 
@@ -491,6 +755,7 @@ export default function SettingsPage() {
       </div>
 
       <div className="max-w-2xl">
+        {tab === "profile" && <ProfileSection />}
         {tab === "organization" && <OrganizationSection />}
         {tab === "license" && <LicenseSection />}
       </div>

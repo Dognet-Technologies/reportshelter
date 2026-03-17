@@ -89,6 +89,17 @@ export function useUpdateMe() {
   });
 }
 
+export function useChangePassword() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { current_password: string; new_password: string; confirm_password: string }) =>
+      apiClient.post("/auth/password/change/", data).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.me });
+    },
+  });
+}
+
 export function useInviteUser() {
   const qc = useQueryClient();
   return useMutation({

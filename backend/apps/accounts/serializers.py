@@ -151,6 +151,32 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
         return attrs
 
 
+class ProfileUpdateSerializer(serializers.ModelSerializer):
+    """Update the authenticated user's own profile (name, email)."""
+
+    email = serializers.EmailField(required=False)
+
+    class Meta:
+        model = User
+        fields = ["first_name", "last_name", "email"]
+
+    def validate_email(self, value: str) -> str:
+        user = self.instance
+        if User.objects.filter(email__iexact=value).exclude(pk=user.pk).exists():
+            raise serializers.ValidationError("A user with this email already exists.")
+        return value.lower()
+
+    def update(self, instance: User, validated_data: dict) -> User:
+        instance.first_name = validated_data.get("first_name", instance.first_name)
+        instance.last_name = validated_data.get("last_name", instance.last_name)
+        new_email = validated_data.get("email")
+        if new_email and new_email != instance.email:
+            instance.email = new_email
+            instance.is_email_verified = False
+        instance.save()
+        return instance
+
+
 class InviteUserSerializer(serializers.Serializer):
     """Invite a user to join the organization."""
 

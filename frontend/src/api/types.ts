@@ -14,6 +14,7 @@ export interface User {
   role: "admin" | "member";
   organization_id: number;
   is_email_verified: boolean;
+  must_change_password: boolean;
   date_joined: string;
   last_login: string | null;
 }

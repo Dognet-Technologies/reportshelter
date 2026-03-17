@@ -36,6 +36,7 @@ from .serializers import (
     PasswordChangeSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
+    ProfileUpdateSerializer,
     RegisterSerializer,
     UserSerializer,
 )
@@ -349,13 +350,25 @@ class MeView(generics.RetrieveUpdateAPIView):
     """
     GET/PATCH /auth/me/
     Retrieve or update the authenticated user's profile.
+    PATCH accepts: first_name, last_name, email.
+    Always returns the full UserSerializer representation.
     """
 
     permission_classes = [permissions.IsAuthenticated]
-    serializer_class = UserSerializer
+
+    def get_serializer_class(self):
+        if self.request.method in ("PUT", "PATCH"):
+            return ProfileUpdateSerializer
+        return UserSerializer
 
     def get_object(self) -> User:
         return self.request.user
+
+    def update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+        response = super().update(request, *args, **kwargs)
+        # Always return full user representation after update
+        response.data = UserSerializer(self.get_object()).data
+        return response
 
 
 # ---------------------------------------------------------------------------

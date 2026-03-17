@@ -18,19 +18,11 @@ const loginSchema = z.object({
 
 type LoginFormData = z.infer<typeof loginSchema>;
 
-interface LoginResponseUser {
-  id: number;
-  email: string;
-  firstName: string;
-  lastName: string;
-  role: "admin" | "member";
-  organizationId: number;
-}
-
 interface LoginResponse {
   access: string;
   refresh: string;
-  user: LoginResponseUser;
+  user: import("@/api/types").User;
+  must_change_password: boolean;
 }
 
 export default function LoginPage() {
@@ -52,11 +44,16 @@ export default function LoginPage() {
       const res = await apiClient.post<LoginResponse>("/auth/login/", data);
       setTokens(res.data.access, res.data.refresh);
       setUser(res.data.user);
-      toast.success("Welcome back!");
-      navigate("/dashboard");
+      if (res.data.must_change_password) {
+        navigate("/change-password");
+      } else {
+        toast.success("Welcome back!");
+        navigate("/dashboard");
+      }
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { detail?: string; non_field_errors?: string[] } } };
+      const axiosErr = err as { response?: { data?: { detail?: string; error?: string; non_field_errors?: string[] } } };
       const detail =
+        axiosErr.response?.data?.error ??
         axiosErr.response?.data?.detail ??
         axiosErr.response?.data?.non_field_errors?.[0] ??
         "Invalid credentials";
