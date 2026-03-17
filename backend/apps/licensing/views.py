@@ -46,7 +46,7 @@ class LicenseStatusView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        return Response({"success": True, "license": LicenseSerializer(license_obj).data})
+        return Response(LicenseSerializer(license_obj).data)
 
 
 class ActivateLicenseView(APIView):
@@ -98,11 +98,7 @@ class ActivateLicenseView(APIView):
             detail={"license_key": license_key[:8] + "****"},
         )
 
-        return Response({
-            "success": True,
-            "message": "License activated successfully.",
-            "license": LicenseSerializer(license_obj).data,
-        })
+        return Response(LicenseSerializer(license_obj).data)
 
 
 class DeactivateLicenseView(APIView):

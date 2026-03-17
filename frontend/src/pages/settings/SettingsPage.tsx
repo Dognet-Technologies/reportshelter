@@ -323,8 +323,11 @@ function LicenseSection() {
       toast.success("License activated successfully!");
       reset();
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { detail?: string } } };
-      const msg = axiosErr.response?.data?.detail ?? "Failed to activate license.";
+      const axiosErr = err as { response?: { data?: { error?: string; detail?: string } } };
+      const msg =
+        axiosErr.response?.data?.error ??
+        axiosErr.response?.data?.detail ??
+        "Failed to activate license.";
       setError("license_key", { message: msg });
     }
   }
