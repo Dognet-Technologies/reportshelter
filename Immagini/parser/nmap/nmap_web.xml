@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE nmaprun>
+<?xml-stylesheet href="file:///usr/bin/../share/nmap/nmap.xsl" type="text/xsl"?>
+<!-- Nmap 7.94SVN scan initiated Wed Mar 18 01:23:17 2026 as: nmap -sV -p 80,443,8080,8443,8000,8888 -&#45;script=http-headers,http-title,http-server-header,http-methods -oX nmap_web.xml 10.99.201.0/24 -->
+<nmaprun scanner="nmap" args="nmap -sV -p 80,443,8080,8443,8000,8888 -&#45;script=http-headers,http-title,http-server-header,http-methods -oX nmap_web.xml 10.99.201.0/24" start="1773793397" startstr="Wed Mar 18 01:23:17 2026" version="7.94SVN" xmloutputversion="1.05">
+<scaninfo type="syn" protocol="tcp" numservices="6" services="80,443,8000,8080,8443,8888"/>
+<verbose level="0"/>
+<debugging level="0"/>
+<hosthint><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="10.99.201.22" addrtype="ipv4"/>
+<address addr="D6:66:D7:7A:0E:58" addrtype="mac"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<host starttime="1773793400" endtime="1773793400"><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="10.99.201.22" addrtype="ipv4"/>
+<address addr="D6:66:D7:7A:0E:58" addrtype="mac"/>
+<hostnames>
+<hostname name="_gateway" type="PTR"/>
+</hostnames>
+<ports><port protocol="tcp" portid="80"><state state="closed" reason="reset" reason_ttl="64"/><service name="http" method="table" conf="3"/></port>
+<port protocol="tcp" portid="443"><state state="closed" reason="reset" reason_ttl="64"/><service name="https" method="table" conf="3"/></port>
+<port protocol="tcp" portid="8000"><state state="closed" reason="reset" reason_ttl="64"/><service name="http-alt" method="table" conf="3"/></port>
+<port protocol="tcp" portid="8080"><state state="closed" reason="reset" reason_ttl="64"/><service name="http-proxy" method="table" conf="3"/></port>
+<port protocol="tcp" portid="8443"><state state="closed" reason="reset" reason_ttl="64"/><service name="https-alt" method="table" conf="3"/></port>
+<port protocol="tcp" portid="8888"><state state="closed" reason="reset" reason_ttl="64"/><service name="sun-answerbook" method="table" conf="3"/></port>
+</ports>
+<times srtt="155000" rttvar="256323" to="1180292"/>
+</host>
+<host starttime="1773793401" endtime="1773793404"><status state="up" reason="localhost-response" reason_ttl="0"/>
+<address addr="10.99.201.56" addrtype="ipv4"/>
+<hostnames>
+<hostname name="lapdog5" type="PTR"/>
+</hostnames>
+<ports><port protocol="tcp" portid="80"><state state="filtered" reason="no-response" reason_ttl="0"/><service name="http" method="table" conf="3"/></port>
+<port protocol="tcp" portid="443"><state state="filtered" reason="no-response" reason_ttl="0"/><service name="https" method="table" conf="3"/></port>
+<port protocol="tcp" portid="8000"><state state="filtered" reason="no-response" reason_ttl="0"/><service name="http-alt" method="table" conf="3"/></port>
+<port protocol="tcp" portid="8080"><state state="filtered" reason="no-response" reason_ttl="0"/><service name="http-proxy" method="table" conf="3"/></port>
+<port protocol="tcp" portid="8443"><state state="filtered" reason="no-response" reason_ttl="0"/><service name="https-alt" method="table" conf="3"/></port>
+<port protocol="tcp" portid="8888"><state state="filtered" reason="no-response" reason_ttl="0"/><service name="sun-answerbook" method="table" conf="3"/></port>
+</ports>
+</host>
+<runstats><finished time="1773793404" timestr="Wed Mar 18 01:23:24 2026" summary="Nmap done at Wed Mar 18 01:23:24 2026; 256 IP addresses (2 hosts up) scanned in 6.35 seconds" elapsed="6.35" exit="success"/><hosts up="2" down="254" total="256"/>
+</runstats>
+</nmaprun>

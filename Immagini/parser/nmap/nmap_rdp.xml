@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE nmaprun>
+<?xml-stylesheet href="file:///usr/bin/../share/nmap/nmap.xsl" type="text/xsl"?>
+<!-- Nmap 7.94SVN scan initiated Wed Mar 18 01:24:57 2026 as: nmap -p 3389 -&#45;script=rdp-enum-encryption,rdp-vuln-ms12-020 -oX nmap_rdp.xml 10.99.201.0/24 -->
+<nmaprun scanner="nmap" args="nmap -p 3389 -&#45;script=rdp-enum-encryption,rdp-vuln-ms12-020 -oX nmap_rdp.xml 10.99.201.0/24" start="1773793497" startstr="Wed Mar 18 01:24:57 2026" version="7.94SVN" xmloutputversion="1.05">
+<scaninfo type="connect" protocol="tcp" numservices="1" services="3389"/>
+<verbose level="0"/>
+<debugging level="0"/>
+<hosthint><status state="up" reason="unknown-response" reason_ttl="0"/>
+<address addr="10.99.201.22" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<host starttime="1773793500" endtime="1773793500"><status state="up" reason="conn-refused" reason_ttl="0"/>
+<address addr="10.99.201.22" addrtype="ipv4"/>
+<hostnames>
+<hostname name="_gateway" type="PTR"/>
+</hostnames>
+<ports><port protocol="tcp" portid="3389"><state state="closed" reason="conn-refused" reason_ttl="0"/><service name="ms-wbt-server" method="table" conf="3"/></port>
+</ports>
+<times srtt="8829" rttvar="9389" to="100000"/>
+</host>
+<runstats><finished time="1773793500" timestr="Wed Mar 18 01:25:00 2026" summary="Nmap done at Wed Mar 18 01:25:00 2026; 256 IP addresses (1 host up) scanned in 3.42 seconds" elapsed="3.42" exit="success"/><hosts up="1" down="255" total="256"/>
+</runstats>
+</nmaprun>
