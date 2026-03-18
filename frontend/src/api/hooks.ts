@@ -385,6 +385,23 @@ export function useTimeline(
 
 // ─── Scan Import hooks ───────────────────────────────────────────────────────
 
+export function useScanImports(subprojectId: number) {
+  return useQuery<ScanImport[]>({
+    queryKey: ["scanImports", subprojectId],
+    queryFn: () =>
+      apiClient
+        .get<ScanImport[]>(`/vulnerabilities/imports/`, { params: { subproject: subprojectId } })
+        .then((r) => r.data),
+    enabled: subprojectId > 0,
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      if (!data) return false;
+      const hasActive = data.some((s) => s.status === "pending" || s.status === "processing");
+      return hasActive ? 2000 : false;
+    },
+  });
+}
+
 export function useScanImport(importId: number) {
   return useQuery<ScanImport>({
     queryKey: queryKeys.scanImport(importId),
