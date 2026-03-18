@@ -28,7 +28,7 @@ import time
 from datetime import datetime, timezone
 from typing import Optional
 
-from canonical_schema import (
+from cyberreport_pro_parsers.parsers.canonical_schema import (
     CisaKevData,
     CvssV2Data,
     CvssV3Data,

@@ -80,9 +80,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-import sys
-sys.path.insert(0, '/home/claude')
-from canonical_schema import (
+from cyberreport_pro_parsers.parsers.canonical_schema import (
     BaseParser,
     NormalizedHost,
     NormalizedVulnerability,

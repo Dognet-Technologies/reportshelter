@@ -42,6 +42,8 @@ const SCANNER_OPTIONS = [
   { value: "burp", label: "Burp Suite (XML)" },
   { value: "zap", label: "OWASP ZAP (XML/JSON)" },
   { value: "metasploit", label: "Metasploit (XML)" },
+  { value: "openvas", label: "OpenVAS / Greenbone (XML or CSV)" },
+  { value: "nessus", label: "Nessus (CSV)" },
   { value: "csv", label: "Generic CSV" },
 ];
 

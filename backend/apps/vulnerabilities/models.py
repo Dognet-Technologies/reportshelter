@@ -29,6 +29,8 @@ class ScanImport(models.Model):
         ZAP = "zap", "OWASP ZAP"
         METASPLOIT = "metasploit", "Metasploit"
         CSV = "csv", "Generic CSV"
+        OPENVAS = "openvas", "OpenVAS / Greenbone"
+        NESSUS = "nessus", "Nessus"
         UNKNOWN = "unknown", "Unknown"
 
     subproject = models.ForeignKey(
