@@ -167,11 +167,12 @@ class ScanImportUploadView(APIView):
 class ScanImportListView(generics.ListAPIView):
     """
     GET /api/v1/vulnerabilities/imports/?subproject=<pk>
-    List all scan imports for a subproject.
+    List all scan imports for a subproject (plain array, no pagination).
     """
 
     serializer_class = ScanImportSerializer
     permission_classes = [permissions.IsAuthenticated]
+    pagination_class = None  # Return plain list, not paginated object
 
     def get_queryset(self):
         qs = ScanImport.objects.filter(

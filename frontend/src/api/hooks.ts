@@ -390,12 +390,12 @@ export function useScanImports(subprojectId: number) {
     queryKey: ["scanImports", subprojectId],
     queryFn: () =>
       apiClient
-        .get<ScanImport[]>(`/vulnerabilities/imports/`, { params: { subproject: subprojectId } })
-        .then((r) => r.data),
+        .get<ScanImport[] | { results: ScanImport[] }>(`/vulnerabilities/imports/`, { params: { subproject: subprojectId } })
+        .then((r) => (Array.isArray(r.data) ? r.data : r.data.results)),
     enabled: subprojectId > 0,
     refetchInterval: (query) => {
       const data = query.state.data;
-      if (!data) return false;
+      if (!Array.isArray(data)) return false;
       const hasActive = data.some((s) => s.status === "pending" || s.status === "processing");
       return hasActive ? 2000 : false;
     },
