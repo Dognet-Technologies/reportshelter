@@ -265,24 +265,28 @@ class ProjectLockAcquireView(APIView):
             organization=request.user.organization,
         )
 
+        now = timezone.now()
+
+        # Check for an existing non-expired lock held by someone else
         try:
-            lock = project.lock
-            if not lock.is_expired() and lock.locked_by_id != request.user.pk:
+            existing = project.lock
+            if not existing.is_expired() and existing.locked_by_id != request.user.pk:
                 return Response(
                     {
-                        "detail": f"Project is locked by {lock.locked_by.full_name} since {lock.locked_at:%H:%M}.",
-                        "locked_by": lock.locked_by.full_name,
-                        "locked_at": lock.locked_at,
+                        "detail": f"Project is locked by {existing.locked_by.full_name} since {existing.locked_at:%H:%M}.",
+                        "locked_by": existing.locked_by.full_name,
+                        "locked_at": existing.locked_at,
                     },
                     status=status.HTTP_423_LOCKED,
                 )
-            # Expired or same user — take over
-            lock.locked_by = request.user
-            lock.locked_at = timezone.now()
-            lock.last_heartbeat = timezone.now()
-            lock.save()
         except Project.lock.RelatedObjectDoesNotExist:
-            lock = ProjectLock.objects.create(project=project, locked_by=request.user)
+            pass
+
+        # Upsert the lock (handles race condition where two requests hit simultaneously)
+        lock, _ = ProjectLock.objects.update_or_create(
+            project=project,
+            defaults={"locked_by": request.user, "locked_at": now, "last_heartbeat": now},
+        )
 
         return Response({"detail": "Lock acquired.", "locked_at": lock.locked_at})
 
