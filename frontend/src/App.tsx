@@ -61,6 +61,11 @@ export default function App() {
         element={<PrivateRoute><VulnerabilityDetailPage /></PrivateRoute>}
       />
       <Route
+        path="/projects/:projectId/reports/builder/:subprojectId"
+        element={<PrivateRoute><ReportBuilderPage /></PrivateRoute>}
+      />
+      {/* Legacy URL: keep working via redirect-like catch */}
+      <Route
         path="/reports/builder/:subprojectId"
         element={<PrivateRoute><ReportBuilderPage /></PrivateRoute>}
       />

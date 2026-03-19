@@ -206,6 +206,7 @@ class ScreenshotListCreateView(generics.ListCreateAPIView):
 
     serializer_class = ScreenshotSerializer
     permission_classes = [permissions.IsAuthenticated]
+    pagination_class = None  # Return plain list
 
     def _get_subproject(self) -> SubProject:
         return get_object_or_404(

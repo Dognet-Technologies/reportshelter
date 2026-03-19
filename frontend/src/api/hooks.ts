@@ -493,8 +493,8 @@ export function useScreenshots(
     queryKey: queryKeys.screenshots(subprojectId),
     queryFn: () =>
       apiClient
-        .get<Screenshot[]>(`/projects/${projectId}/subprojects/${subprojectId}/screenshots/`)
-        .then((r) => r.data),
+        .get<Screenshot[] | { results: Screenshot[] }>(`/projects/${projectId}/subprojects/${subprojectId}/screenshots/`)
+        .then((r) => (Array.isArray(r.data) ? r.data : r.data.results)),
     enabled: projectId > 0 && subprojectId > 0,
     ...options,
   });

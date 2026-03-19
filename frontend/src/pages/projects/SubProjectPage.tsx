@@ -9,11 +9,11 @@
  *   5. Main grid: vulnerability table (left) + exports + screenshots (right)
  */
 import { useState, useCallback, useEffect, useRef } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { useDropzone } from "react-dropzone";
 import {
   Upload, Loader2, FileText, Download, Image, AlertCircle, CheckCircle2,
-  Clock, RefreshCw, Plus, ChevronRight, BarChart2, Palette, Info,
+  Clock, RefreshCw, Plus, ChevronRight, ChevronLeft, BarChart2, Palette, Info,
   Database, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { format } from "date-fns";
@@ -582,6 +582,7 @@ export default function SubProjectPage() {
   const { projectId, id } = useParams<{ projectId: string; id: string }>();
   const pId = Number(projectId);
   const spId = Number(id);
+  const navigate = useNavigate();
 
   const { data: subproject, isLoading } = useSubProject(pId, spId);
   const { data: license } = useLicenseStatus();
@@ -625,8 +626,8 @@ export default function SubProjectPage() {
   const [extra,          setExtra]          = useState<ExtraConfig>(DEFAULT_EXTRA);
   const [selectedScanIds,setSelectedScanIds]= useState<Set<number>>(new Set());
 
-  const RISK_LEVELS: RiskLevel[]  = ["Critical","High","Medium","Low","Info"];
-  const STATUSES:    VulnStatus[] = ["Open","Fixed","Accepted","Retest"];
+  const RISK_LEVELS: RiskLevel[]  = ["critical","high","medium","low","info"];
+  const STATUSES:    VulnStatus[] = ["open","fixed","accepted","retest"];
 
   function togglePanel(id: PanelId) { setActivePanel((p) => (p === id ? null : id)); }
   function toggleChart(id: string)  { setEnabledCharts((p) => ({ ...p, [id]: !p[id] })); }
@@ -647,8 +648,12 @@ export default function SubProjectPage() {
 
   return (
     <Layout>
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-1.5 text-sm text-slate-500 mb-4 flex-wrap">
+      {/* Breadcrumb + back */}
+      <div className="flex items-center gap-2 text-sm text-slate-500 mb-4 flex-wrap">
+        <button onClick={() => navigate(-1)} className="flex items-center gap-1 hover:text-slate-200 transition-colors">
+          <ChevronLeft className="h-3.5 w-3.5" />Back
+        </button>
+        <span className="text-slate-700">·</span>
         <Link to="/projects" className="hover:text-slate-300">Projects</Link>
         <ChevronRight className="h-3.5 w-3.5" />
         <Link to={`/projects/${pId}`} className="hover:text-slate-300">Project</Link>
@@ -660,10 +665,10 @@ export default function SubProjectPage() {
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-5">
         <div>
           <h1 className="text-2xl font-bold text-slate-100">{subproject.title}</h1>
-          <p className="text-slate-400 text-sm mt-1">{format(new Date(subproject.scan_date), "MMMM d, yyyy")}</p>
+          <p className="text-slate-400 text-sm mt-1">{subproject.scan_date ? format(new Date(subproject.scan_date), "MMMM d, yyyy") : "—"}</p>
           {subproject.description && <p className="text-slate-500 text-sm mt-1">{subproject.description}</p>}
         </div>
-        <Link to={`/reports/builder/${spId}`} className="btn-primary shrink-0">
+        <Link to={`/projects/${pId}/reports/builder/${spId}`} className="btn-primary shrink-0">
           <FileText className="h-4 w-4" />Generate Report
         </Link>
       </div>
@@ -756,7 +761,7 @@ export default function SubProjectPage() {
           <div className="card">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold text-slate-100 flex items-center gap-2 text-sm"><FileText className="h-4 w-4" />Exports</h3>
-              <Link to={`/reports/builder/${spId}`} className="btn-primary text-xs py-1.5"><Plus className="h-3.5 w-3.5" />Generate</Link>
+              <Link to={`/projects/${pId}/reports/builder/${spId}`} className="btn-primary text-xs py-1.5"><Plus className="h-3.5 w-3.5" />Generate</Link>
             </div>
             {!exports?.length ? (
               <p className="text-slate-500 text-sm text-center py-3">No reports yet.</p>

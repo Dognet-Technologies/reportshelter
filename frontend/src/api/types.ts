@@ -112,6 +112,12 @@ export interface SubProject {
   description: string;
   scan_date: string | null;
   vulnerability_count: number;
+  critical_count: number;
+  high_count: number;
+  medium_count: number;
+  low_count: number;
+  info_count: number;
+  open_count: number;
   created_by: number | null;
   created_at: string;
   updated_at: string;
