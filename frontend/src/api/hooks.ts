@@ -445,6 +445,17 @@ export function useUploadScan(subprojectId: number) {
   });
 }
 
+export function useRetryScanImport(subprojectId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (importId: number) =>
+      apiClient.post<ScanImport>(`/vulnerabilities/imports/${importId}/retry/`).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["scanImports", subprojectId] });
+    },
+  });
+}
+
 // ─── Report Export hooks ─────────────────────────────────────────────────────
 
 export function useReportExports(

@@ -20,7 +20,7 @@ import { format } from "date-fns";
 import toast from "react-hot-toast";
 import {
   useSubProject, useVulnerabilities, useUploadScan, useScanImports,
-  useReportExports, useScreenshots, useUploadScreenshot, useLicenseStatus,
+  useReportExports, useScreenshots, useUploadScreenshot, useLicenseStatus, useRetryScanImport,
 } from "@/api/hooks";
 import { downloadReport } from "@/api/download";
 import { useQueryClient } from "@tanstack/react-query";
@@ -427,6 +427,7 @@ interface ScansPanelProps {
 
 function ScansPanel({ subprojectId, selectedScanIds, onSelectionChange, canImport }: ScansPanelProps) {
   const { data: imports, isLoading } = useScanImports(subprojectId);
+  const retry = useRetryScanImport(subprojectId);
   const [scannerType, setScannerType] = useState("nmap");
   const upload = useUploadScan(subprojectId);
   const qc = useQueryClient();
@@ -494,26 +495,45 @@ function ScansPanel({ subprojectId, selectedScanIds, onSelectionChange, canImpor
         ) : (
           <div className="space-y-1">
             {imports.map((imp) => (
-              <div key={imp.id} className={`flex items-center gap-3 rounded-lg border px-3 py-2 text-xs transition-colors ${
+              <div key={imp.id} className={`rounded-lg border px-3 py-2 text-xs transition-colors ${
                 imp.status === "done" && selectedScanIds.has(imp.id)
                   ? "border-blue-600/50 bg-blue-950/20"
+                  : imp.status === "failed"
+                  ? "border-red-900/50"
                   : "border-slate-800"
               }`}>
-                <input
-                  type="checkbox"
-                  checked={imp.status === "done" && selectedScanIds.has(imp.id)}
-                  onChange={() => imp.status === "done" && toggleOne(imp.id)}
-                  disabled={imp.status !== "done"}
-                  className="rounded border-slate-600 bg-slate-800 text-blue-500"
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="text-slate-200 font-medium truncate">{imp.original_filename}</p>
-                  <p className="text-slate-500">{imp.tool.toUpperCase()} · {format(new Date(imp.imported_at), "MMM d, HH:mm")}</p>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    checked={imp.status === "done" && selectedScanIds.has(imp.id)}
+                    onChange={() => imp.status === "done" && toggleOne(imp.id)}
+                    disabled={imp.status !== "done"}
+                    className="rounded border-slate-600 bg-slate-800 text-blue-500"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-slate-200 font-medium truncate">{imp.original_filename}</p>
+                    <p className="text-slate-500">{imp.tool.toUpperCase()} · {format(new Date(imp.imported_at), "MMM d, HH:mm")}</p>
+                  </div>
+                  <div className="text-right shrink-0 flex items-center gap-2">
+                    {imp.status === "done" && <p className="text-slate-400">{imp.vulnerability_count} findings</p>}
+                    <ImportStatusBadge status={imp.status} />
+                    {(imp.status === "failed" || imp.status === "processing") && (
+                      <button
+                        onClick={() => retry.mutate(imp.id, { onSuccess: () => toast.success("Re-queued."), onError: () => toast.error("Retry failed.") })}
+                        disabled={retry.isPending}
+                        className="ml-1 text-slate-400 hover:text-blue-400 transition-colors"
+                        title="Retry import"
+                      >
+                        {retry.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div className="text-right shrink-0">
-                  {imp.status === "done" && <p className="text-slate-400">{imp.vulnerability_count} findings</p>}
-                  <ImportStatusBadge status={imp.status} />
-                </div>
+                {imp.status === "failed" && imp.error_message && (
+                  <p className="mt-1.5 ml-7 text-red-400 text-xs leading-snug line-clamp-2" title={imp.error_message}>
+                    {imp.error_message}
+                  </p>
+                )}
               </div>
             ))}
           </div>

@@ -199,6 +199,39 @@ class ScanImportDetailView(generics.RetrieveAPIView):
         )
 
 
+class ScanImportRetryView(APIView):
+    """
+    POST /api/v1/vulnerabilities/imports/<pk>/retry/
+    Re-queue a scan import that is stuck in 'processing' or has 'failed'.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request: Request, pk: int) -> Response:
+        scan_import = get_object_or_404(
+            ScanImport,
+            pk=pk,
+            subproject__project__organization=request.user.organization,
+        )
+
+        if scan_import.status == ScanImport.Status.DONE:
+            return Response(
+                {"detail": "Import already completed successfully."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Reset to pending so the UI shows the right state before the task runs
+        scan_import.status = ScanImport.Status.PENDING
+        scan_import.error_message = ""
+        scan_import.save(update_fields=["status", "error_message"])
+
+        from apps.parsers.tasks import parse_scan_file
+        parse_scan_file.delay(scan_import.pk)
+
+        logger.info("ScanImport %s re-queued by %s.", pk, request.user.email)
+        return Response(ScanImportSerializer(scan_import).data)
+
+
 class VulnerabilityDiffView(APIView):
     """
     GET /api/v1/vulnerabilities/diff/?current=<sp_id>&previous=<sp_id>
