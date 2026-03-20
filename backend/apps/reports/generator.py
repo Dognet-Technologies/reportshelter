@@ -58,6 +58,11 @@ ALL_SECTIONS: set[str] = {
 }
 
 
+# Sections always rendered in the template regardless of user selection.
+# They must not be counted when deciding whether to fall back to ALL_SECTIONS.
+_STRUCTURAL_SECTIONS = frozenset({"cover", "last_page"})
+
+
 class ReportGenerator:
     """
     Builds reports (PDF, HTML, XML) for a SubProject.
@@ -185,12 +190,20 @@ class ReportGenerator:
 
     def _get_enabled_sections(self) -> set[str]:
         """
-        Return the set of section IDs to render.
-        Falls back to ALL_SECTIONS when the options list is absent or empty
-        (preserves backward compatibility with old exports).
+        Return the set of content section IDs to render.
+
+        "cover" and "last_page" are structural — they are always rendered in
+        the template outside any conditional block, so they must not be counted
+        when deciding whether the user actually selected content sections.
+
+        Fall-back to ALL_SECTIONS when:
+          - options contains no "sections" key, or
+          - the list is empty, or
+          - the list contains only structural sections (cover / last_page).
         """
         sections = self.options.get("sections") or []
-        return set(sections) if sections else ALL_SECTIONS
+        content = set(sections) - _STRUCTURAL_SECTIONS
+        return content if content else ALL_SECTIONS
 
     def _build_hosts_breakdown(self, vulnerabilities: list[Vulnerability]) -> dict[str, list[Vulnerability]]:
         """Group vulnerabilities by affected_host, sorted by count desc."""
