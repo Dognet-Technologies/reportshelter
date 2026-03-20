@@ -53,19 +53,21 @@
       {% endif %}
     }
 
-    /* Watermark */
+    /* Watermark — WeasyPrint-safe (no CSS transform) */
     {% if project.watermark_text %}
-    body::before {
-      content: "{{ project.watermark_text }}";
+    #watermark {
       position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%) rotate(-35deg);
+      top: 35%;
+      left: 5%;
+      width: 90%;
+      text-align: center;
       font-size: 60pt;
+      font-weight: bold;
       color: rgba(0,0,0,{{ project.watermark_opacity }});
       z-index: -1;
       white-space: nowrap;
       pointer-events: none;
+      opacity: {{ project.watermark_opacity }};
     }
     {% endif %}
 
@@ -180,6 +182,11 @@
   </style>
 </head>
 <body>
+
+  <!-- Watermark -->
+  {% if project.watermark_text %}
+  <div id="watermark">{{ project.watermark_text }}</div>
+  {% endif %}
 
   <!-- Running header -->
   <div id="running-header">

@@ -9,15 +9,16 @@ interface SeverityBadgeProps {
 }
 
 const SEVERITY_CLASSES: Record<RiskLevel, string> = {
-  Critical: "badge-critical",
-  High: "badge-high",
-  Medium: "badge-medium",
-  Low: "badge-low",
-  Info: "badge-info",
+  critical: "badge-critical",
+  high: "badge-high",
+  medium: "badge-medium",
+  low: "badge-low",
+  info: "badge-info",
 };
 
 export function SeverityBadge({ level, className = "" }: SeverityBadgeProps) {
+  const display = level.charAt(0).toUpperCase() + level.slice(1);
   return (
-    <span className={`${SEVERITY_CLASSES[level]} ${className}`}>{level}</span>
+    <span className={`${SEVERITY_CLASSES[level] ?? "badge-info"} ${className}`}>{display}</span>
   );
 }

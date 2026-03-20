@@ -36,6 +36,7 @@ from .serializers import (
     PasswordChangeSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
+    ProfileUpdateSerializer,
     RegisterSerializer,
     UserSerializer,
 )
@@ -65,19 +66,6 @@ def _is_locked_out(email: str) -> bool:
         attempted_at__gte=window,
     ).count()
     return recent_failures >= max_attempts
-
-
-def _send_verification_email(user: User, token: EmailVerificationToken) -> None:
-    """Send email address verification link."""
-    frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173")
-    verify_url = f"{frontend_url}/verify-email?token={token.token}"
-    send_mail(
-        subject="Verify your CyberReport Pro email",
-        message=f"Hi {user.first_name or user.email},\n\nVerify your email: {verify_url}\n\nThis link expires in 24 hours.",
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=[user.email],
-        fail_silently=True,
-    )
 
 
 def _send_password_reset_email(user: User, token: PasswordResetToken) -> None:
@@ -112,10 +100,6 @@ class RegisterView(APIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
 
-        # Create and send verification token
-        token = EmailVerificationToken.objects.create(user=user)
-        _send_verification_email(user, token)
-
         AuditLog.log(
             action=AuditLog.Action.USER_REGISTERED,
             user=user,
@@ -129,7 +113,7 @@ class RegisterView(APIView):
         return Response(
             {
                 "success": True,
-                "message": "Registration successful. Please check your email to verify your account.",
+                "message": "Registration successful. You can now log in.",
                 "user": UserSerializer(user).data,
             },
             status=status.HTTP_201_CREATED,
@@ -224,6 +208,7 @@ class LoginView(APIView):
                 "access": str(access),
                 "refresh": str(refresh),
                 "user": UserSerializer(user).data,
+                "must_change_password": user.must_change_password,
             }
         )
 
@@ -281,7 +266,8 @@ class PasswordChangeView(APIView):
             )
 
         user.set_password(serializer.validated_data["new_password"])
-        user.save(update_fields=["password"])
+        user.must_change_password = False
+        user.save(update_fields=["password", "must_change_password"])
 
         AuditLog.log(
             action=AuditLog.Action.PASSWORD_RESET,
@@ -364,13 +350,25 @@ class MeView(generics.RetrieveUpdateAPIView):
     """
     GET/PATCH /auth/me/
     Retrieve or update the authenticated user's profile.
+    PATCH accepts: first_name, last_name, email.
+    Always returns the full UserSerializer representation.
     """
 
     permission_classes = [permissions.IsAuthenticated]
-    serializer_class = UserSerializer
+
+    def get_serializer_class(self):
+        if self.request.method in ("PUT", "PATCH"):
+            return ProfileUpdateSerializer
+        return UserSerializer
 
     def get_object(self) -> User:
         return self.request.user
+
+    def update(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+        response = super().update(request, *args, **kwargs)
+        # Always return full user representation after update
+        response.data = UserSerializer(self.get_object()).data
+        return response
 
 
 # ---------------------------------------------------------------------------

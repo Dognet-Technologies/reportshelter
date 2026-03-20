@@ -4,6 +4,7 @@ import { useAuthStore } from "@/store/authStore";
 // Auth pages
 import LoginPage from "@/pages/auth/LoginPage";
 import RegisterPage from "@/pages/auth/RegisterPage";
+import ChangePasswordPage from "@/pages/auth/ChangePasswordPage";
 
 // App pages
 import DashboardPage from "@/pages/DashboardPage";
@@ -17,7 +18,10 @@ import SettingsPage from "@/pages/settings/SettingsPage";
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
+  const user = useAuthStore((s) => s.user);
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (user?.must_change_password) return <Navigate to="/change-password" replace />;
+  return <>{children}</>;
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
@@ -31,6 +35,9 @@ export default function App() {
       {/* Public routes */}
       <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
       <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
+
+      {/* Force password change (authenticated but restricted) */}
+      <Route path="/change-password" element={<ChangePasswordPage />} />
 
       {/* Private routes */}
       <Route
@@ -53,6 +60,11 @@ export default function App() {
         path="/vulnerabilities/:id"
         element={<PrivateRoute><VulnerabilityDetailPage /></PrivateRoute>}
       />
+      <Route
+        path="/projects/:projectId/reports/builder/:subprojectId"
+        element={<PrivateRoute><ReportBuilderPage /></PrivateRoute>}
+      />
+      {/* Legacy URL: keep working via redirect-like catch */}
       <Route
         path="/reports/builder/:subprojectId"
         element={<PrivateRoute><ReportBuilderPage /></PrivateRoute>}

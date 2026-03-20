@@ -3,7 +3,6 @@ Views for the licensing app.
 """
 
 import logging
-import uuid
 
 from rest_framework import permissions, status
 from rest_framework.request import Request
@@ -13,11 +12,20 @@ from rest_framework.views import APIView
 from apps.accounts.models import AuditLog
 from apps.accounts.permissions import IsOrgAdmin
 
-from .models import License, LicenseStatus
+from .models import License, LicenseStatus, SALES_CONTACT
 from .serializers import ActivateLicenseSerializer, LicenseSerializer
 from .wp_license_client import WPLicenseClient, WPLicenseClientError
 
 logger = logging.getLogger(__name__)
+
+_EXPIRED_MSG = (
+    "Your license has expired. "
+    f"Contact {SALES_CONTACT} to purchase or renew."
+)
+_NOT_CONFIGURED_MSG = (
+    "License activation service is not reachable. "
+    f"Contact {SALES_CONTACT} for assistance."
+)
 
 
 class LicenseStatusView(APIView):
@@ -38,18 +46,13 @@ class LicenseStatusView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        return Response(
-            {
-                "success": True,
-                "license": LicenseSerializer(license_obj).data,
-            }
-        )
+        return Response(LicenseSerializer(license_obj).data)
 
 
 class ActivateLicenseView(APIView):
     """
     POST /licensing/activate/
-    Activate a PRO license key via WP License Manager.
+    Activate a PRO license key via the DLM server.
     Only org admins can activate.
     """
 
@@ -59,33 +62,26 @@ class ActivateLicenseView(APIView):
         serializer = ActivateLicenseSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        license_key = serializer.validated_data["license_key"]
+        license_key: str = serializer.validated_data["license_key"]
         org = request.user.organization
-        # Use org ID as instance identifier for the WP License Manager
         instance_id = str(org.id)
 
         client = WPLicenseClient()
-        try:
-            license_info = client.activate_license(license_key, instance_id)
-        except NotImplementedError:
+        if not client._configured:
             return Response(
-                {
-                    "success": False,
-                    "error": (
-                        "License activation is not yet configured. "
-                        "Set WP_LICENSE_API_URL, WP_LICENSE_API_KEY, and WP_LICENSE_API_SECRET."
-                    ),
-                },
+                {"success": False, "error": _NOT_CONFIGURED_MSG},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
-        except WPLicenseClientError as e:
-            logger.warning("License activation failed for org %s: %s", org.id, e)
+
+        try:
+            license_info = client.activate_license(license_key, instance_id)
+        except WPLicenseClientError as exc:
+            logger.warning("License activation failed for org %s: %s", org.id, exc)
             return Response(
-                {"success": False, "error": f"License activation failed: {e}"},
+                {"success": False, "error": f"License activation failed: {exc}"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Parse expiry date from API response
         from django.utils.dateparse import parse_datetime
         expires_at = parse_datetime(license_info.expires_at) if license_info.expires_at else None
 
@@ -102,19 +98,14 @@ class ActivateLicenseView(APIView):
             detail={"license_key": license_key[:8] + "****"},
         )
 
-        return Response(
-            {
-                "success": True,
-                "message": "License activated successfully.",
-                "license": LicenseSerializer(license_obj).data,
-            }
-        )
+        return Response(LicenseSerializer(license_obj).data)
 
 
 class DeactivateLicenseView(APIView):
     """
     POST /licensing/deactivate/
     Deactivate the current PRO license (org admin only).
+    Always requires a successful call to the DLM server — no offline bypass.
     """
 
     permission_classes = [permissions.IsAuthenticated, IsOrgAdmin]
@@ -124,7 +115,10 @@ class DeactivateLicenseView(APIView):
         try:
             license_obj = org.license
         except License.DoesNotExist:
-            return Response({"success": False, "error": "No license found."}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"success": False, "error": "No license found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
         if license_obj.status != LicenseStatus.PRO_ACTIVE:
             return Response(
@@ -133,14 +127,34 @@ class DeactivateLicenseView(APIView):
             )
 
         client = WPLicenseClient()
+        if not client._configured:
+            return Response(
+                {"success": False, "error": _NOT_CONFIGURED_MSG},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
         instance_id = str(org.id)
         try:
             client.deactivate_license(license_obj.license_key, instance_id)
-        except NotImplementedError:
-            # WP client not configured — still allow local deactivation
-            logger.info("WP License client not configured; deactivating locally for org %s", org.id)
-        except WPLicenseClientError as e:
-            logger.warning("Remote deactivation failed: %s", e)
+        except WPLicenseClientError as exc:
+            logger.warning("Remote deactivation failed for org %s: %s", org.id, exc)
+            return Response(
+                {
+                    "success": False,
+                    "error": (
+                        f"Could not deactivate license on the server: {exc}. "
+                        f"Contact {SALES_CONTACT} if the problem persists."
+                    ),
+                },
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
 
         license_obj.invalidate()
+
+        AuditLog.log(
+            action=AuditLog.Action.LICENSE_ACTIVATED,
+            user=request.user,
+            detail={"action": "deactivated", "license_key": license_obj.license_key[:8] + "****"},
+        )
+
         return Response({"success": True, "message": "License deactivated."})

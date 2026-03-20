@@ -30,6 +30,30 @@ class SubProjectSerializer(serializers.ModelSerializer):
     """Serializer for SubProject — list and detail."""
 
     vulnerability_count = serializers.IntegerField(read_only=True, default=0)
+    critical_count = serializers.SerializerMethodField()
+    high_count = serializers.SerializerMethodField()
+    medium_count = serializers.SerializerMethodField()
+    low_count = serializers.SerializerMethodField()
+    info_count = serializers.SerializerMethodField()
+    open_count = serializers.SerializerMethodField()
+
+    def get_critical_count(self, obj: SubProject) -> int:
+        return getattr(obj, "critical_count", None) or obj.vulnerabilities.filter(risk_level="critical").count()
+
+    def get_high_count(self, obj: SubProject) -> int:
+        return getattr(obj, "high_count", None) or obj.vulnerabilities.filter(risk_level="high").count()
+
+    def get_medium_count(self, obj: SubProject) -> int:
+        return getattr(obj, "medium_count", None) or obj.vulnerabilities.filter(risk_level="medium").count()
+
+    def get_low_count(self, obj: SubProject) -> int:
+        return getattr(obj, "low_count", None) or obj.vulnerabilities.filter(risk_level="low").count()
+
+    def get_info_count(self, obj: SubProject) -> int:
+        return getattr(obj, "info_count", None) or obj.vulnerabilities.filter(risk_level="info").count()
+
+    def get_open_count(self, obj: SubProject) -> int:
+        return getattr(obj, "open_count", None) or obj.vulnerabilities.filter(vuln_status="open").count()
 
     class Meta:
         model = SubProject
@@ -40,6 +64,12 @@ class SubProjectSerializer(serializers.ModelSerializer):
             "description",
             "scan_date",
             "vulnerability_count",
+            "critical_count",
+            "high_count",
+            "medium_count",
+            "low_count",
+            "info_count",
+            "open_count",
             "created_by",
             "created_at",
             "updated_at",

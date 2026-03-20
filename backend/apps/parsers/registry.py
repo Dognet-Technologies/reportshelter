@@ -10,6 +10,7 @@ from .csv_parser import CSVParser
 from .metasploit_parser import MetasploitParser
 from .nikto_parser import NiktoParser
 from .nmap_parser import NmapParser
+from .openvas_parser import NessusParser, OpenVasParser
 from .zap_parser import ZAPParser
 
 PARSER_REGISTRY: dict[str, type[BaseParser]] = {
@@ -19,6 +20,8 @@ PARSER_REGISTRY: dict[str, type[BaseParser]] = {
     "zap": ZAPParser,
     "metasploit": MetasploitParser,
     "csv": CSVParser,
+    "openvas": OpenVasParser,
+    "nessus": NessusParser,
 }
 
 

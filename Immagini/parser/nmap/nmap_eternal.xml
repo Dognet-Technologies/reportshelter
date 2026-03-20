@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE nmaprun>
+<?xml-stylesheet href="file:///usr/bin/../share/nmap/nmap.xsl" type="text/xsl"?>
+<!-- Nmap 7.94SVN scan initiated Wed Mar 18 01:32:58 2026 as: nmap -sV -&#45;script=smb-vuln-ms17-010,smb-vuln-ms08-067,smb-vuln-cve2009-3103 -p 445 -oX nmap_eternal.xml 10.99.201.0/24 -->
+<nmaprun scanner="nmap" args="nmap -sV -&#45;script=smb-vuln-ms17-010,smb-vuln-ms08-067,smb-vuln-cve2009-3103 -p 445 -oX nmap_eternal.xml 10.99.201.0/24" start="1773793978" startstr="Wed Mar 18 01:32:58 2026" version="7.94SVN" xmloutputversion="1.05">
+<scaninfo type="connect" protocol="tcp" numservices="1" services="445"/>
+<verbose level="0"/>
+<debugging level="0"/>
+<hosthint><status state="up" reason="unknown-response" reason_ttl="0"/>
+<address addr="10.99.201.22" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<hosthint><status state="up" reason="unknown-response" reason_ttl="0"/>
+<address addr="10.99.201.56" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<host starttime="1773793982" endtime="1773793982"><status state="up" reason="conn-refused" reason_ttl="0"/>
+<address addr="10.99.201.22" addrtype="ipv4"/>
+<hostnames>
+<hostname name="_gateway" type="PTR"/>
+</hostnames>
+<ports><port protocol="tcp" portid="445"><state state="closed" reason="conn-refused" reason_ttl="0"/><service name="microsoft-ds" method="table" conf="3"/></port>
+</ports>
+<times srtt="9126" rttvar="9646" to="100000"/>
+</host>
+<host starttime="1773793982" endtime="1773793982"><status state="up" reason="syn-ack" reason_ttl="0"/>
+<address addr="10.99.201.56" addrtype="ipv4"/>
+<hostnames>
+<hostname name="lapdog5" type="PTR"/>
+</hostnames>
+<ports><port protocol="tcp" portid="445"><state state="closed" reason="conn-refused" reason_ttl="0"/><service name="microsoft-ds" method="table" conf="3"/></port>
+</ports>
+<times srtt="188" rttvar="2839" to="100000"/>
+</host>
+<runstats><finished time="1773793982" timestr="Wed Mar 18 01:33:02 2026" summary="Nmap done at Wed Mar 18 01:33:02 2026; 256 IP addresses (2 hosts up) scanned in 3.44 seconds" elapsed="3.44" exit="success"/><hosts up="2" down="254" total="256"/>
+</runstats>
+</nmaprun>

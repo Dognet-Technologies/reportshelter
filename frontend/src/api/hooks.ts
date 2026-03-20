@@ -89,6 +89,17 @@ export function useUpdateMe() {
   });
 }
 
+export function useChangePassword() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { current_password: string; new_password: string; confirm_password: string }) =>
+      apiClient.post("/auth/password/change/", data).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.me });
+    },
+  });
+}
+
 export function useInviteUser() {
   const qc = useQueryClient();
   return useMutation({
@@ -374,6 +385,23 @@ export function useTimeline(
 
 // ─── Scan Import hooks ───────────────────────────────────────────────────────
 
+export function useScanImports(subprojectId: number) {
+  return useQuery<ScanImport[]>({
+    queryKey: ["scanImports", subprojectId],
+    queryFn: () =>
+      apiClient
+        .get<ScanImport[] | { results: ScanImport[] }>(`/vulnerabilities/imports/`, { params: { subproject: subprojectId } })
+        .then((r) => (Array.isArray(r.data) ? r.data : r.data.results)),
+    enabled: subprojectId > 0,
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      if (!Array.isArray(data)) return false;
+      const hasActive = data.some((s) => s.status === "pending" || s.status === "processing");
+      return hasActive ? 2000 : false;
+    },
+  });
+}
+
 export function useScanImport(importId: number) {
   return useQuery<ScanImport>({
     queryKey: queryKeys.scanImport(importId),
@@ -465,8 +493,8 @@ export function useScreenshots(
     queryKey: queryKeys.screenshots(subprojectId),
     queryFn: () =>
       apiClient
-        .get<Screenshot[]>(`/projects/${projectId}/subprojects/${subprojectId}/screenshots/`)
-        .then((r) => r.data),
+        .get<Screenshot[] | { results: Screenshot[] }>(`/projects/${projectId}/subprojects/${subprojectId}/screenshots/`)
+        .then((r) => (Array.isArray(r.data) ? r.data : r.data.results)),
     enabled: projectId > 0 && subprojectId > 0,
     ...options,
   });

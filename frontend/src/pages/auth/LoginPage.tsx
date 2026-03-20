@@ -18,19 +18,32 @@ const loginSchema = z.object({
 
 type LoginFormData = z.infer<typeof loginSchema>;
 
-interface LoginResponseUser {
-  id: number;
-  email: string;
-  firstName: string;
-  lastName: string;
-  role: "admin" | "member";
-  organizationId: number;
-}
-
 interface LoginResponse {
   access: string;
   refresh: string;
-  user: LoginResponseUser;
+  user: import("@/api/types").User;
+  must_change_password: boolean;
+}
+
+/**
+ * Logo shown above the login card.
+ * Tries to load /logo.png from the public folder.
+ * Falls back to the ShieldCheck icon if the file is missing.
+ * To use your own logo: place logo.png in frontend/public/.
+ */
+function LoginLogo() {
+  const [imgError, setImgError] = useState(false);
+  if (!imgError) {
+    return (
+      <img
+        src="/logo.png"
+        alt="CyberReport Pro"
+        className="h-16 w-auto mb-3 object-contain"
+        onError={() => setImgError(true)}
+      />
+    );
+  }
+  return <ShieldCheck className="h-12 w-12 text-blue-500 mb-3" />;
 }
 
 export default function LoginPage() {
@@ -52,11 +65,16 @@ export default function LoginPage() {
       const res = await apiClient.post<LoginResponse>("/auth/login/", data);
       setTokens(res.data.access, res.data.refresh);
       setUser(res.data.user);
-      toast.success("Welcome back!");
-      navigate("/dashboard");
+      if (res.data.must_change_password) {
+        navigate("/change-password");
+      } else {
+        toast.success("Welcome back!");
+        navigate("/dashboard");
+      }
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { detail?: string; non_field_errors?: string[] } } };
+      const axiosErr = err as { response?: { data?: { detail?: string; error?: string; non_field_errors?: string[] } } };
       const detail =
+        axiosErr.response?.data?.error ??
         axiosErr.response?.data?.detail ??
         axiosErr.response?.data?.non_field_errors?.[0] ??
         "Invalid credentials";
@@ -69,7 +87,7 @@ export default function LoginPage() {
       <div className="card w-full max-w-md">
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <ShieldCheck className="h-12 w-12 text-blue-500 mb-3" />
+          <LoginLogo />
           <h1 className="text-2xl font-bold text-slate-100">CyberReport Pro</h1>
           <p className="text-slate-400 text-sm mt-1">Sign in to your account</p>
         </div>

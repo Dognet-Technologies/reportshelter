@@ -10,7 +10,6 @@ from rest_framework.test import APIClient
 
 from apps.accounts.models import (
     AuditLog,
-    EmailVerificationToken,
     LoginAttempt,
     Organization,
     PasswordResetToken,
@@ -69,6 +68,9 @@ class TestRegistration:
         assert resp.data["success"] is True
         assert User.objects.filter(email="admin@acme.com").exists()
         assert Organization.objects.filter(name="Acme Corp").exists()
+        # Email is verified immediately — no verification step needed
+        new_user = User.objects.get(email="admin@acme.com")
+        assert new_user.is_email_verified is True
 
     def test_register_duplicate_email_rejected(self, api_client, user):
         url = reverse("accounts:register")
@@ -103,34 +105,6 @@ class TestRegistration:
 
 
 # ---------------------------------------------------------------------------
-# Email Verification
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.django_db
-class TestEmailVerification:
-    def test_verify_email_valid_token(self, api_client, user):
-        token = EmailVerificationToken.objects.create(user=user)
-        user.is_email_verified = False
-        user.save()
-        url = reverse("accounts:verify-email") + f"?token={token.token}"
-        resp = api_client.get(url)
-        assert resp.status_code == status.HTTP_200_OK
-        user.refresh_from_db()
-        assert user.is_email_verified is True
-
-    def test_verify_email_invalid_token(self, api_client):
-        url = reverse("accounts:verify-email") + "?token=00000000-0000-0000-0000-000000000000"
-        resp = api_client.get(url)
-        assert resp.status_code == status.HTTP_400_BAD_REQUEST
-
-    def test_verify_email_missing_token(self, api_client):
-        url = reverse("accounts:verify-email")
-        resp = api_client.get(url)
-        assert resp.status_code == status.HTTP_400_BAD_REQUEST
-
-
-# ---------------------------------------------------------------------------
 # Login
 # ---------------------------------------------------------------------------
 
@@ -153,6 +127,13 @@ class TestLogin:
         url = reverse("accounts:login")
         resp = api_client.post(url, {"email": "nobody@example.com", "password": "pass"}, format="json")
         assert resp.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_login_response_includes_must_change_password(self, api_client, user):
+        url = reverse("accounts:login")
+        resp = api_client.post(url, {"email": "test@example.com", "password": "SecurePass123!"}, format="json")
+        assert resp.status_code == status.HTTP_200_OK
+        assert "must_change_password" in resp.data
+        assert resp.data["must_change_password"] is False
 
     def test_login_creates_audit_log(self, api_client, user):
         url = reverse("accounts:login")

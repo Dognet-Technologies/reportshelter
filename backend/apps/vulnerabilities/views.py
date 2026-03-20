@@ -164,6 +164,26 @@ class ScanImportUploadView(APIView):
         return Response(ScanImportSerializer(scan_import).data, status=status.HTTP_201_CREATED)
 
 
+class ScanImportListView(generics.ListAPIView):
+    """
+    GET /api/v1/vulnerabilities/imports/?subproject=<pk>
+    List all scan imports for a subproject (plain array, no pagination).
+    """
+
+    serializer_class = ScanImportSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    pagination_class = None  # Return plain list, not paginated object
+
+    def get_queryset(self):
+        qs = ScanImport.objects.filter(
+            subproject__project__organization=self.request.user.organization
+        ).order_by("-imported_at")
+        subproject_pk = self.request.query_params.get("subproject")
+        if subproject_pk:
+            qs = qs.filter(subproject_id=subproject_pk)
+        return qs
+
+
 class ScanImportDetailView(generics.RetrieveAPIView):
     """
     GET /api/v1/vulnerabilities/imports/<pk>/

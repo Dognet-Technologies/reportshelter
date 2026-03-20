@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE nmaprun>
+<?xml-stylesheet href="file:///usr/bin/../share/nmap/nmap.xsl" type="text/xsl"?>
+<!-- Nmap 7.94SVN scan initiated Wed Mar 18 01:33:40 2026 as: nmap -sV -p 80,443,8080,8443 -&#45;script=http-vuln*,http-shellshock,http-slowloris-check,http-csrf,http-dombased-xss,http-stored-xss -oX nmap_http_vuln.xml 10.99.201.0/24 -->
+<nmaprun scanner="nmap" args="nmap -sV -p 80,443,8080,8443 -&#45;script=http-vuln*,http-shellshock,http-slowloris-check,http-csrf,http-dombased-xss,http-stored-xss -oX nmap_http_vuln.xml 10.99.201.0/24" start="1773794020" startstr="Wed Mar 18 01:33:40 2026" version="7.94SVN" xmloutputversion="1.05">
+<scaninfo type="connect" protocol="tcp" numservices="4" services="80,443,8080,8443"/>
+<verbose level="0"/>
+<debugging level="0"/>
+<hosthint><status state="up" reason="unknown-response" reason_ttl="0"/>
+<address addr="10.99.201.22" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<hosthint><status state="up" reason="unknown-response" reason_ttl="0"/>
+<address addr="10.99.201.56" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<host starttime="1773794025" endtime="1773794025"><status state="up" reason="conn-refused" reason_ttl="0"/>
+<address addr="10.99.201.22" addrtype="ipv4"/>
+<hostnames>
+<hostname name="_gateway" type="PTR"/>
+</hostnames>
+<ports><port protocol="tcp" portid="80"><state state="closed" reason="conn-refused" reason_ttl="0"/><service name="http" method="table" conf="3"/></port>
+<port protocol="tcp" portid="443"><state state="closed" reason="conn-refused" reason_ttl="0"/><service name="https" method="table" conf="3"/></port>
+<port protocol="tcp" portid="8080"><state state="closed" reason="conn-refused" reason_ttl="0"/><service name="http-proxy" method="table" conf="3"/></port>
+<port protocol="tcp" portid="8443"><state state="closed" reason="conn-refused" reason_ttl="0"/><service name="https-alt" method="table" conf="3"/></port>
+</ports>
+<times srtt="19661" rttvar="26051" to="123865"/>
+</host>
+<host starttime="1773794025" endtime="1773794052"><status state="up" reason="syn-ack" reason_ttl="0"/>
+<address addr="10.99.201.56" addrtype="ipv4"/>
+<hostnames>
+<hostname name="lapdog5" type="PTR"/>
+</hostnames>
+<ports><port protocol="tcp" portid="80"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="http" product="Apache httpd" version="2.4.58" extrainfo="(Ubuntu)" method="probed" conf="10"><cpe>cpe:/a:apache:http_server:2.4.58</cpe></service><script id="http-stored-xss" output="Couldn&apos;t find any stored XSS vulnerabilities."/><script id="http-csrf" output="Couldn&apos;t find any CSRF vulnerabilities."/><script id="http-server-header" output="Apache/2.4.58 (Ubuntu)"><elem>Apache/2.4.58 (Ubuntu)</elem>
+</script><script id="http-dombased-xss" output="Couldn&apos;t find any DOM based XSS."/></port>
+<port protocol="tcp" portid="443"><state state="closed" reason="conn-refused" reason_ttl="0"/><service name="https" method="table" conf="3"/></port>
+<port protocol="tcp" portid="8080"><state state="closed" reason="conn-refused" reason_ttl="0"/><service name="http-proxy" method="table" conf="3"/></port>
+<port protocol="tcp" portid="8443"><state state="closed" reason="conn-refused" reason_ttl="0"/><service name="https-alt" method="table" conf="3"/></port>
+</ports>
+<times srtt="101" rttvar="1243" to="100000"/>
+</host>
+<runstats><finished time="1773794052" timestr="Wed Mar 18 01:34:12 2026" summary="Nmap done at Wed Mar 18 01:34:12 2026; 256 IP addresses (2 hosts up) scanned in 32.55 seconds" elapsed="32.55" exit="success"/><hosts up="2" down="254" total="256"/>
+</runstats>
+</nmaprun>

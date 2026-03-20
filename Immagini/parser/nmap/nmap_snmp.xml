@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE nmaprun>
+<?xml-stylesheet href="file:///usr/bin/../share/nmap/nmap.xsl" type="text/xsl"?>
+<!-- Nmap 7.94SVN scan initiated Wed Mar 18 01:25:49 2026 as: nmap -sU -p 161 -&#45;script=snmp-info,snmp-sysdescr -oX nmap_snmp.xml 10.99.201.0/24 -->
+<nmaprun scanner="nmap" args="nmap -sU -p 161 -&#45;script=snmp-info,snmp-sysdescr -oX nmap_snmp.xml 10.99.201.0/24" start="1773793549" startstr="Wed Mar 18 01:25:49 2026" version="7.94SVN" xmloutputversion="1.05">
+<scaninfo type="udp" protocol="udp" numservices="1" services="161"/>
+<verbose level="0"/>
+<debugging level="0"/>
+<hosthint><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="10.99.201.22" addrtype="ipv4"/>
+<address addr="D6:66:D7:7A:0E:58" addrtype="mac"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<host starttime="1773793551" endtime="1773793551"><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="10.99.201.22" addrtype="ipv4"/>
+<address addr="D6:66:D7:7A:0E:58" addrtype="mac"/>
+<hostnames>
+<hostname name="_gateway" type="PTR"/>
+</hostnames>
+<ports><port protocol="udp" portid="161"><state state="closed" reason="port-unreach" reason_ttl="64"/><service name="snmp" method="table" conf="3"/></port>
+</ports>
+<times srtt="16329" rttvar="19432" to="100000"/>
+</host>
+<host starttime="1773793552" endtime="1773793552"><status state="up" reason="localhost-response" reason_ttl="0"/>
+<address addr="10.99.201.56" addrtype="ipv4"/>
+<hostnames>
+<hostname name="lapdog5" type="PTR"/>
+</hostnames>
+<ports><port protocol="udp" portid="161"><state state="closed" reason="port-unreach" reason_ttl="64"/><service name="snmp" method="table" conf="3"/></port>
+</ports>
+<times srtt="66" rttvar="5000" to="100000"/>
+</host>
+<runstats><finished time="1773793552" timestr="Wed Mar 18 01:25:52 2026" summary="Nmap done at Wed Mar 18 01:25:52 2026; 256 IP addresses (2 hosts up) scanned in 2.86 seconds" elapsed="2.86" exit="success"/><hosts up="2" down="254" total="256"/>
+</runstats>
+</nmaprun>

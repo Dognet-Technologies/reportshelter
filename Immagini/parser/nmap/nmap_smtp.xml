@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE nmaprun>
+<?xml-stylesheet href="file:///usr/bin/../share/nmap/nmap.xsl" type="text/xsl"?>
+<!-- Nmap 7.94SVN scan initiated Wed Mar 18 01:26:36 2026 as: nmap -p 25,465,587 -&#45;script=smtp-commands,smtp-enum-users,smtp-open-relay -oX nmap_smtp.xml 10.99.201.0/24 -->
+<nmaprun scanner="nmap" args="nmap -p 25,465,587 -&#45;script=smtp-commands,smtp-enum-users,smtp-open-relay -oX nmap_smtp.xml 10.99.201.0/24" start="1773793596" startstr="Wed Mar 18 01:26:36 2026" version="7.94SVN" xmloutputversion="1.05">
+<scaninfo type="syn" protocol="tcp" numservices="3" services="25,465,587"/>
+<verbose level="0"/>
+<debugging level="0"/>
+<hosthint><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="10.99.201.22" addrtype="ipv4"/>
+<address addr="D6:66:D7:7A:0E:58" addrtype="mac"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<host starttime="1773793599" endtime="1773793599"><status state="up" reason="arp-response" reason_ttl="0"/>
+<address addr="10.99.201.22" addrtype="ipv4"/>
+<address addr="D6:66:D7:7A:0E:58" addrtype="mac"/>
+<hostnames>
+<hostname name="_gateway" type="PTR"/>
+</hostnames>
+<ports><port protocol="tcp" portid="25"><state state="closed" reason="reset" reason_ttl="64"/><service name="smtp" method="table" conf="3"/></port>
+<port protocol="tcp" portid="465"><state state="closed" reason="reset" reason_ttl="64"/><service name="smtps" method="table" conf="3"/></port>
+<port protocol="tcp" portid="587"><state state="closed" reason="reset" reason_ttl="64"/><service name="submission" method="table" conf="3"/></port>
+</ports>
+<times srtt="12603" rttvar="16122" to="100000"/>
+</host>
+<host starttime="1773793599" endtime="1773793617"><status state="up" reason="localhost-response" reason_ttl="0"/>
+<address addr="10.99.201.56" addrtype="ipv4"/>
+<hostnames>
+<hostname name="lapdog5" type="PTR"/>
+</hostnames>
+<ports><port protocol="tcp" portid="25"><state state="open" reason="syn-ack" reason_ttl="64"/><service name="smtp" method="table" conf="3"/><script id="smtp-enum-users" output="&#xa;  root&#xa;"/><script id="smtp-open-relay" output="Server doesn&apos;t seem to be an open relay, all tests failed"/><script id="smtp-commands" output="lapdog5, PIPELINING, SIZE 10240000, VRFY, ETRN, STARTTLS, ENHANCEDSTATUSCODES, 8BITMIME, DSN, SMTPUTF8, CHUNKING"/></port>
+<port protocol="tcp" portid="465"><state state="closed" reason="reset" reason_ttl="64"/><service name="smtps" method="table" conf="3"/></port>
+<port protocol="tcp" portid="587"><state state="closed" reason="reset" reason_ttl="64"/><service name="submission" method="table" conf="3"/></port>
+</ports>
+<times srtt="85" rttvar="2848" to="100000"/>
+</host>
+<runstats><finished time="1773793617" timestr="Wed Mar 18 01:26:57 2026" summary="Nmap done at Wed Mar 18 01:26:57 2026; 256 IP addresses (2 hosts up) scanned in 21.04 seconds" elapsed="21.04" exit="success"/><hosts up="2" down="254" total="256"/>
+</runstats>
+</nmaprun>
