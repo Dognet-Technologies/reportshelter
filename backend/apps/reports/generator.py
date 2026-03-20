@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import io
 import xml.etree.ElementTree as ET
-from collections import Counter
+from collections import Counter, defaultdict
 from pathlib import Path
 
 from django.conf import settings
@@ -18,6 +18,44 @@ from apps.vulnerabilities.models import Vulnerability
 
 from .charts import host_bar_chart, risk_matrix_chart, severity_pie_chart, timeline_chart
 from .models import ReportExport
+
+# Human-readable labels for report type IDs (matches frontend reportTypes.ts).
+REPORT_TYPE_LABELS: dict[str, str] = {
+    "pentest":        "Penetration Test Report",
+    "va":             "Vulnerability Assessment",
+    "red_team":       "Red Team Report",
+    "web_app":        "Web Application Security Report",
+    "mobile_app":     "Mobile Application Security Report",
+    "cloud":          "Cloud Security Assessment",
+    "network":        "Network Security Assessment",
+    "social_eng":     "Social Engineering Report",
+    "incident":       "Incident Response Report",
+    "threat_intel":   "Threat Intelligence Report",
+    "compliance":     "Compliance Gap Assessment",
+    "osint":          "OSINT Report",
+    "executive":      "Executive Summary",
+    "it_infra":       "IT Infrastructure Assessment",
+    "code_review":    "Code Review Report",
+    "arch_review":    "Architecture Review",
+    "dr":             "Disaster Recovery Assessment",
+    "it_audit":       "IT Audit",
+    "remediation":    "Remediation Plan",
+    "retest":         "Retest / Verification Report",
+    "risk_register":  "Risk Register",
+    "patch_mgmt":     "Patch Management Report",
+    "breach":         "Breach Notification Report",
+    "forensic":       "Forensic Investigation Report",
+    "malware":        "Malware Analysis Report",
+    "lessons_learned":"Post-Incident Lessons Learned",
+}
+
+# All known section IDs — used as fallback when sections list is empty.
+ALL_SECTIONS: set[str] = {
+    "cover", "toc", "executive_summary", "risk_summary", "scope",
+    "attack_timeline", "ioc", "vuln_details", "host_breakdown",
+    "remediation_plan", "diff_retest", "risk_register", "compliance_matrix",
+    "osint_findings", "recommendations", "appendix", "last_page",
+}
 
 
 class ReportGenerator:
@@ -145,27 +183,54 @@ class ReportGenerator:
 
         return list(qs.order_by("-risk_score", "-cvss_score", "title"))
 
+    def _get_enabled_sections(self) -> set[str]:
+        """
+        Return the set of section IDs to render.
+        Falls back to ALL_SECTIONS when the options list is absent or empty
+        (preserves backward compatibility with old exports).
+        """
+        sections = self.options.get("sections") or []
+        return set(sections) if sections else ALL_SECTIONS
+
+    def _build_hosts_breakdown(self, vulnerabilities: list[Vulnerability]) -> dict[str, list[Vulnerability]]:
+        """Group vulnerabilities by affected_host, sorted by count desc."""
+        grouped: dict[str, list[Vulnerability]] = defaultdict(list)
+        for v in vulnerabilities:
+            key = v.affected_host or "(unknown)"
+            grouped[key].append(v)
+        return dict(sorted(grouped.items(), key=lambda x: len(x[1]), reverse=True))
+
     def _render_html_template(self) -> str:
         """Render the Jinja2 template with full context."""
         vulnerabilities = self._get_vulnerabilities()
         severity_counts = dict(Counter(v.risk_level for v in vulnerabilities))
+        sections = self._get_enabled_sections()
 
-        # Generate charts
-        charts = {
-            "pie": severity_pie_chart(vulnerabilities),
-            "bar": host_bar_chart(vulnerabilities),
-            "risk_matrix": risk_matrix_chart(vulnerabilities),
+        report_type = self.options.get("report_type", "")
+        report_type_label = REPORT_TYPE_LABELS.get(report_type, "Security Assessment Report")
+        audience = self.options.get("audience", "technical")
+
+        # Generate charts (only when relevant sections are enabled)
+        charts: dict[str, str] = {
+            "pie": "",
+            "bar": "",
+            "risk_matrix": "",
             "timeline": "",
         }
+        show_charts = bool({"executive_summary", "risk_summary"} & sections)
+        if show_charts:
+            charts["pie"] = severity_pie_chart(vulnerabilities)
+            charts["bar"] = host_bar_chart(vulnerabilities)
+            charts["risk_matrix"] = risk_matrix_chart(vulnerabilities)
 
         # Timeline chart (only if project has multiple subprojects)
-        from apps.projects.models import SubProject
-        if SubProject.objects.filter(project=self.project).count() > 1:
-            timeline_data = build_timeline(self.project.pk)
-            charts["timeline"] = timeline_chart(timeline_data)
+        if "appendix" in sections or "executive_summary" in sections:
+            from apps.projects.models import SubProject
+            if SubProject.objects.filter(project=self.project).count() > 1:
+                timeline_data = build_timeline(self.project.pk)
+                charts["timeline"] = timeline_chart(timeline_data)
 
-        template_name = self.project.template_name or "default"
-        template_file = "base.html"  # Could be extended to support multiple templates
+        hosts = self._build_hosts_breakdown(vulnerabilities)
 
         context = {
             "project": self.project,
@@ -174,11 +239,21 @@ class ReportGenerator:
             "vulnerabilities": vulnerabilities,
             "severity_counts": severity_counts,
             "charts": charts,
+            # Section control
+            "sections": sections,
+            # Report metadata
+            "report_type": report_type,
+            "report_type_label": report_type_label,
+            "audience": audience,
+            # Pre-grouped data for host breakdown section
+            "hosts": hosts,
         }
+
+        template_file = "base.html"
+        template_dir = Path(settings.BASE_DIR) / "templates" / "reports"
 
         from jinja2 import FileSystemLoader
         from .jinja2_env import environment as setup_env
-        template_dir = Path(settings.BASE_DIR) / "templates" / "reports"
         env = setup_env(loader=FileSystemLoader(str(template_dir)), autoescape=True)
 
         template = env.get_template(template_file)

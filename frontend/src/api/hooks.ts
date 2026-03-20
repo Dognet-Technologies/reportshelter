@@ -509,7 +509,14 @@ export function useGenerateReport() {
       subproject: number;
       format: ReportFormat;
       risk_levels?: RiskLevel[];
-      vuln_status?: VulnStatus[];
+      /** Vulnerability status filter (sent as "statuses" to match frontend field name). */
+      statuses?: VulnStatus[];
+      /** Report type ID (e.g. "pentest", "va", "executive"). */
+      report_type?: string;
+      /** Ordered list of section IDs to include. */
+      sections?: string[];
+      /** Target audience: "executive" | "management" | "technical". */
+      audience?: string;
     }) =>
       apiClient.post<ReportExport>("/reports/generate/", data).then((r) => r.data),
     onSuccess: (report) => {
