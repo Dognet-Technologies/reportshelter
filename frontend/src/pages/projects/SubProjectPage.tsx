@@ -673,23 +673,6 @@ export default function SubProjectPage() {
         </Link>
       </div>
 
-      {/* Stats row */}
-      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 mb-4">
-        {[
-          { label: "Critical", count: subproject.critical_count, color: "text-red-400" },
-          { label: "High",     count: subproject.high_count,     color: "text-orange-400" },
-          { label: "Medium",   count: subproject.medium_count,   color: "text-yellow-400" },
-          { label: "Low",      count: subproject.low_count,      color: "text-blue-400" },
-          { label: "Info",     count: subproject.info_count,     color: "text-slate-400" },
-          { label: "Open",     count: subproject.open_count,     color: "text-red-300" },
-        ].map((s) => (
-          <div key={s.label} className="card py-2.5 px-3 text-center">
-            <p className={`text-lg font-bold ${s.color}`}>{s.count}</p>
-            <p className="text-xs text-slate-500">{s.label}</p>
-          </div>
-        ))}
-      </div>
-
       {/* 5-button Report Config Toolbar */}
       <div className="flex gap-2 flex-wrap mb-3">
         <ToolbarButton id="report_type" active={activePanel === "report_type"} icon={<FileText className="h-4 w-4" />}
