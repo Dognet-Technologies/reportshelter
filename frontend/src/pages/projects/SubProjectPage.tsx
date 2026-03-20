@@ -703,7 +703,7 @@ export default function SubProjectPage() {
         </div>
         <Link
           to={`/projects/${pId}/reports/builder/${spId}`}
-          state={{ reportType, audience, style, extra }}
+          state={{ reportType, audience, style, extra, enabledCharts, chartVariants }}
           className="btn-primary shrink-0"
         >
           <FileText className="h-4 w-4" />Generate Report
@@ -781,7 +781,7 @@ export default function SubProjectPage() {
           <div className="card">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold text-slate-100 flex items-center gap-2 text-sm"><FileText className="h-4 w-4" />Exports</h3>
-              <Link to={`/projects/${pId}/reports/builder/${spId}`} state={{ reportType, audience, style, extra }} className="btn-primary text-xs py-1.5"><Plus className="h-3.5 w-3.5" />Generate</Link>
+              <Link to={`/projects/${pId}/reports/builder/${spId}`} state={{ reportType, audience, style, extra, enabledCharts, chartVariants }} className="btn-primary text-xs py-1.5"><Plus className="h-3.5 w-3.5" />Generate</Link>
             </div>
             {!exports?.length ? (
               <p className="text-slate-500 text-sm text-center py-3">No reports yet.</p>

@@ -193,6 +193,20 @@ interface IncomingConfig {
   audience?: string[];
   style?: Record<string, string>;
   extra?: Record<string, unknown>;
+  enabledCharts?: Record<string, boolean>;
+  chartVariants?: Record<string, string>;
+}
+
+/**
+ * Collapse the audience array (e.g. ["management","technical"]) to the single
+ * least-restrictive value so the template knows what to show.
+ * "technical" > "management" > "executive"
+ */
+function collapseAudience(arr: string[] | undefined): string {
+  if (!arr || arr.length === 0) return "technical";
+  if (arr.includes("technical")) return "technical";
+  if (arr.includes("management")) return "management";
+  return "executive";
 }
 
 function initFromConfig(config: IncomingConfig | undefined): {
@@ -239,6 +253,13 @@ export default function ReportBuilderPage() {
   const [enabledSections, setEnabledSections] = useState<Set<string>>(init.enabledSections);
   const [selectedRiskLevels, setSelectedRiskLevels] = useState<string[]>([...RISK_LEVELS]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>(["open", "retest"]);
+
+  // Opaque config forwarded verbatim from SubProjectPage — no UI in Builder.
+  const rptAudience = collapseAudience(incoming?.audience);
+  const rptStyle = incoming?.style ?? undefined;
+  const rptExtra = incoming?.extra ?? undefined;
+  const rptChartsEnabled = incoming?.enabledCharts ?? undefined;
+  const rptChartsVariants = incoming?.chartVariants ?? undefined;
   const [generatedExportId, setGeneratedExportId] = useState<number | null>(null);
 
   const canExport = license?.is_active ?? false;
@@ -294,6 +315,11 @@ export default function ReportBuilderPage() {
         statuses: selectedStatuses,
         report_type: reportType || undefined,
         sections: orderedSections.filter((id) => enabledSections.has(id)),
+        audience: rptAudience,
+        ...(rptStyle         ? { style: rptStyle }                 : {}),
+        ...(rptExtra         ? { extra: rptExtra }                 : {}),
+        ...(rptChartsEnabled ? { charts_enabled: rptChartsEnabled } : {}),
+        ...(rptChartsVariants? { charts_variants: rptChartsVariants} : {}),
       });
       setGeneratedExportId(result.id);
       toast.success("Report generation started!");

@@ -517,6 +517,14 @@ export function useGenerateReport() {
       sections?: string[];
       /** Target audience: "executive" | "management" | "technical". */
       audience?: string;
+      /** Per-report visual style (colors, font, watermark, etc.). */
+      style?: Record<string, string>;
+      /** Extra metadata (classification, scope, authors, methodologies, etc.). */
+      extra?: Record<string, unknown>;
+      /** Which charts to include, keyed by chart ID. */
+      charts_enabled?: Record<string, boolean>;
+      /** Chart variant selections (e.g. "Donut" vs "Pie"). */
+      charts_variants?: Record<string, string>;
     }) =>
       apiClient.post<ReportExport>("/reports/generate/", data).then((r) => r.data),
     onSuccess: (report) => {

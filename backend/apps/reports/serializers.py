@@ -81,3 +81,34 @@ class ReportGenerateSerializer(serializers.Serializer):
         default="technical",
         help_text="Target audience: 'executive', 'management', or 'technical'.",
     )
+
+    # Per-report visual overrides (from SubProjectPage StylePanel)
+    style = serializers.DictField(
+        child=serializers.CharField(allow_blank=True),
+        required=False,
+        help_text=(
+            "Visual overrides: primaryColor, secondaryColor, font, watermark, "
+            "borderRadius, titleSize, evidenceStyle."
+        ),
+    )
+
+    # Extra metadata (from SubProjectPage ExtraInfoPanel)
+    extra = serializers.DictField(
+        required=False,
+        help_text=(
+            "Extra metadata: classification, version, scope, engagement_type, "
+            "methodologies, authors, references."
+        ),
+    )
+
+    # Chart configuration (from SubProjectPage ChartsPanel)
+    charts_enabled = serializers.DictField(
+        child=serializers.BooleanField(),
+        required=False,
+        help_text="Which charts to generate, keyed by chart ID.",
+    )
+    charts_variants = serializers.DictField(
+        child=serializers.CharField(),
+        required=False,
+        help_text="Chart variant selection per chart ID (e.g. 'Donut', 'Pie').",
+    )

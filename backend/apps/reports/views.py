@@ -69,6 +69,14 @@ class ReportGenerateView(APIView):
             options["sections"] = data["sections"]
         if data.get("audience"):
             options["audience"] = data["audience"]
+        if data.get("style"):
+            options["style"] = data["style"]
+        if data.get("extra"):
+            options["extra"] = data["extra"]
+        if data.get("charts_enabled"):
+            options["charts_enabled"] = data["charts_enabled"]
+        if data.get("charts_variants"):
+            options["charts_variants"] = data["charts_variants"]
 
         export = ReportExport.objects.create(
             subproject=subproject,

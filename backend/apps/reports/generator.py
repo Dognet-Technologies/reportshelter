@@ -213,53 +213,127 @@ class ReportGenerator:
             grouped[key].append(v)
         return dict(sorted(grouped.items(), key=lambda x: len(x[1]), reverse=True))
 
+    def _build_rpt_style(self) -> dict:
+        """
+        Build a flat style dict for the template, merging per-report overrides
+        (options["style"]) with project-level defaults.
+        """
+        s    = self.options.get("style") or {}
+        proj = self.project
+
+        primary   = s.get("primaryColor")   or getattr(proj, "primary_color",   None) or "#3b82f6"
+        secondary = s.get("secondaryColor") or getattr(proj, "secondary_color", None) or "#64748b"
+        font      = s.get("font")           or getattr(proj, "font_family",     None) or "Inter"
+        watermark = s.get("watermark")      or getattr(proj, "watermark_text",  None) or ""
+        w_opacity = str(getattr(proj, "watermark_opacity", "0.15") or "0.15")
+
+        br_map = {"none": "0px", "sm": "2px", "md": "6px", "lg": "12px"}
+        br_px  = br_map.get(s.get("borderRadius", "md"), "6px")
+
+        ts_map = {
+            "sm": {"h1": "20pt", "h2": "13pt", "h3": "10pt"},
+            "md": {"h1": "24pt", "h2": "16pt", "h3": "12pt"},
+            "lg": {"h1": "28pt", "h2": "20pt", "h3": "14pt"},
+            "xl": {"h1": "34pt", "h2": "24pt", "h3": "16pt"},
+        }
+        ts = ts_map.get(s.get("titleSize", "md"), ts_map["md"])
+
+        return {
+            "primary_color":    primary,
+            "secondary_color":  secondary,
+            "font":             font,
+            "watermark":        watermark,
+            "watermark_opacity": w_opacity,
+            "border_radius_px": br_px,
+            "evidence_style":   s.get("evidenceStyle", "code"),
+            "title_h1":         ts["h1"],
+            "title_h2":         ts["h2"],
+            "title_h3":         ts["h3"],
+        }
+
+    def _build_rpt_extra(self) -> dict:
+        """Return the per-report extra metadata dict."""
+        e = self.options.get("extra") or {}
+        return {
+            "classification":  e.get("classification", "CONFIDENTIAL"),
+            "version":         e.get("version", "1.0"),
+            "scope":           e.get("scope", ""),
+            "engagement_type": e.get("engagement_type", ""),
+            "methodologies":   e.get("methodologies") or [],
+            "authors":         e.get("authors", ""),
+            "references":      e.get("references", ""),
+        }
+
+    def _build_charts(self, sections: set[str], vulnerabilities: list) -> dict[str, str]:
+        """
+        Generate only the charts that are both enabled and relevant to active sections.
+        Falls back to the 4 default charts when no explicit chart config is present.
+        """
+        enabled      = self.options.get("charts_enabled") or {}
+        use_defaults = not enabled
+
+        def is_on(chart_id: str) -> bool:
+            return enabled.get(chart_id, True) if not use_defaults else True
+
+        charts: dict[str, str] = {"pie": "", "bar": "", "risk_matrix": "", "timeline": ""}
+
+        if bool({"executive_summary", "risk_summary"} & sections):
+            if is_on("severity_donut"):
+                charts["pie"] = severity_pie_chart(vulnerabilities)
+            if is_on("top_hosts_bar"):
+                charts["bar"] = host_bar_chart(vulnerabilities)
+            if is_on("risk_matrix"):
+                charts["risk_matrix"] = risk_matrix_chart(vulnerabilities)
+
+        if ("appendix" in sections or "executive_summary" in sections) and is_on("trend_line"):
+            from apps.projects.models import SubProject
+            if SubProject.objects.filter(project=self.project).count() > 1:
+                charts["timeline"] = timeline_chart(build_timeline(self.project.pk))
+
+        return charts
+
     def _render_html_template(self) -> str:
         """Render the Jinja2 template with full context."""
         vulnerabilities = self._get_vulnerabilities()
         severity_counts = dict(Counter(v.risk_level for v in vulnerabilities))
-        sections = self._get_enabled_sections()
+        sections        = self._get_enabled_sections()
 
-        report_type = self.options.get("report_type", "")
+        # Ordered list respects drag-and-drop user ordering.
+        raw_ordered      = self.options.get("sections") or []
+        _structural      = {"cover", "last_page"}
+        ordered_sections: list[str] = [s for s in raw_ordered if s in sections and s not in _structural]
+        # Safety net: append any enabled sections missing from the stored list.
+        ordered_sections += [s for s in sections if s not in ordered_sections and s not in _structural]
+
+        report_type       = self.options.get("report_type", "")
         report_type_label = REPORT_TYPE_LABELS.get(report_type, "Security Assessment Report")
-        audience = self.options.get("audience", "technical")
+        audience          = self.options.get("audience", "technical")
 
-        # Generate charts (only when relevant sections are enabled)
-        charts: dict[str, str] = {
-            "pie": "",
-            "bar": "",
-            "risk_matrix": "",
-            "timeline": "",
-        }
-        show_charts = bool({"executive_summary", "risk_summary"} & sections)
-        if show_charts:
-            charts["pie"] = severity_pie_chart(vulnerabilities)
-            charts["bar"] = host_bar_chart(vulnerabilities)
-            charts["risk_matrix"] = risk_matrix_chart(vulnerabilities)
-
-        # Timeline chart (only if project has multiple subprojects)
-        if "appendix" in sections or "executive_summary" in sections:
-            from apps.projects.models import SubProject
-            if SubProject.objects.filter(project=self.project).count() > 1:
-                timeline_data = build_timeline(self.project.pk)
-                charts["timeline"] = timeline_chart(timeline_data)
-
-        hosts = self._build_hosts_breakdown(vulnerabilities)
+        rpt_style = self._build_rpt_style()
+        rpt_extra = self._build_rpt_extra()
+        charts    = self._build_charts(sections, vulnerabilities)
+        hosts     = self._build_hosts_breakdown(vulnerabilities)
 
         context = {
-            "project": self.project,
-            "subproject": self.subproject,
-            "org": self.org,
-            "vulnerabilities": vulnerabilities,
-            "severity_counts": severity_counts,
-            "charts": charts,
+            "project":           self.project,
+            "subproject":        self.subproject,
+            "org":               self.org,
+            "vulnerabilities":   vulnerabilities,
+            "severity_counts":   severity_counts,
+            "charts":            charts,
             # Section control
-            "sections": sections,
+            "sections":          sections,           # set  — fast membership checks
+            "ordered_sections":  ordered_sections,   # list — rendering order
+            # Per-report style overrides (merged with project defaults)
+            "rpt_style":         rpt_style,
+            # Per-report extra metadata
+            "rpt_extra":         rpt_extra,
             # Report metadata
-            "report_type": report_type,
+            "report_type":       report_type,
             "report_type_label": report_type_label,
-            "audience": audience,
-            # Pre-grouped data for host breakdown section
-            "hosts": hosts,
+            "audience":          audience,
+            # Pre-grouped data
+            "hosts":             hosts,
         }
 
         template_file = "base.html"
