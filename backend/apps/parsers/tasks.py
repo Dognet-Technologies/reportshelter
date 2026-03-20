@@ -40,7 +40,7 @@ def parse_scan_file(self, scan_import_id: int) -> dict:
         return {"error": "ScanImport not found."}
 
     scan_import.status = ScanImport.Status.PROCESSING
-    scan_import.celery_task_id = self.request.id or ""
+    scan_import.celery_task_id = self.request.id or None
     scan_import.save(update_fields=["status", "celery_task_id"])
 
     try:

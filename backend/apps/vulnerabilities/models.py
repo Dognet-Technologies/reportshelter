@@ -53,7 +53,7 @@ class ScanImport(models.Model):
     )
     imported_at = models.DateTimeField(auto_now_add=True)
     processed_at = models.DateTimeField(null=True, blank=True)
-    celery_task_id = models.CharField(max_length=255, blank=True, default="")
+    celery_task_id = models.CharField(max_length=255, blank=True, null=True, default=None)
 
     class Meta:
         verbose_name = "Scan Import"
