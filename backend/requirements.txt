@@ -29,6 +29,7 @@ pillow==11.1.0
 
 # PDF generation
 weasyprint==62.3
+pydyf==0.10.0
 reportlab==4.2.5
 
 # Templating
