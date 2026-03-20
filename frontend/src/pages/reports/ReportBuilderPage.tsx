@@ -23,6 +23,7 @@ import toast from "react-hot-toast";
 import {
   useVulnerabilities, useGenerateReport, useReportExport, useLicenseStatus, useSubProject,
 } from "@/api/hooks";
+import { downloadReport } from "@/api/download";
 import { Layout } from "@/components/Layout";
 import { SeverityBadge } from "@/components/SeverityBadge";
 import type { ReportFormat } from "@/api/types";
@@ -36,8 +37,21 @@ import type { ReportTypeId } from "@/constants/reportTypes";
 
 function ExportStatusCard({ exportId }: { exportId: number }) {
   const { data: exp } = useReportExport(exportId);
-  const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api/v1";
+  const [downloading, setDownloading] = useState(false);
+
   if (!exp) return null;
+
+  async function handleDownload() {
+    setDownloading(true);
+    try {
+      await downloadReport(exportId, exp!.format);
+    } catch {
+      toast.error("Download failed. Please try again.");
+    } finally {
+      setDownloading(false);
+    }
+  }
+
   return (
     <div className={`card border ${exp.status === "done" ? "border-green-700" : exp.status === "failed" ? "border-red-700" : "border-slate-700"}`}>
       <div className="flex items-center gap-3">
@@ -60,9 +74,10 @@ function ExportStatusCard({ exportId }: { exportId: number }) {
           )}
         </div>
         {exp.status === "done" && (
-          <a href={`${BASE_URL}/reports/exports/${exportId}/download/`} download className="btn-primary shrink-0">
-            <Download className="h-4 w-4" />Download {exp.format.toUpperCase()}
-          </a>
+          <button onClick={handleDownload} disabled={downloading} className="btn-primary shrink-0">
+            {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            {downloading ? "Downloading…" : `Download ${exp.format.toUpperCase()}`}
+          </button>
         )}
       </div>
     </div>
