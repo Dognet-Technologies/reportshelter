@@ -1,5 +1,5 @@
 /**
- * React Query hooks for all CyberReport Pro API endpoints.
+ * React Query hooks for all ReportShelter PRO API endpoints.
  */
 import {
   useQuery,
@@ -108,6 +108,20 @@ export function useInviteUser() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.users });
     },
+  });
+}
+
+// ─── Admin hooks ─────────────────────────────────────────────────────────────
+
+interface DBStats {
+  db_size: string | null;
+  counts: Record<string, number>;
+}
+
+export function useDBStats() {
+  return useQuery<DBStats>({
+    queryKey: ["admin", "db-stats"],
+    queryFn: () => apiClient.get<DBStats>("/auth/admin/db-stats/").then((r) => r.data),
   });
 }
 

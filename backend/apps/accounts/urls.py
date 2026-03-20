@@ -31,4 +31,11 @@ urlpatterns = [
 
     # Audit log
     path("audit-log/", views.AuditLogView.as_view(), name="audit-log"),
+
+    # System admin
+    path("admin/db-stats/", views.DBStatsView.as_view(), name="db-stats"),
+    path("admin/db-export/", views.DBExportView.as_view(), name="db-export"),
+    path("admin/db-reset/", views.DBResetView.as_view(), name="db-reset"),
+    path("admin/system-info/", views.SystemInfoView.as_view(), name="system-info"),
+    path("admin/system-update/", views.SystemUpdateView.as_view(), name="system-update"),
 ]

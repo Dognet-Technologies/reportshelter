@@ -29,7 +29,7 @@ pillow==12.1.1
 
 # PDF generation
 weasyprint==68.0
-reportlab==4.1.0
+reportlab==4.2.5
 
 # Templating
 Jinja2==3.1.6
@@ -47,7 +47,10 @@ django-anymail==12.0
 python-decouple==3.8
 python-json-logger==3.2.1
 django-extensions==3.2.3
-django-storages==1.14.2
+django-storages==1.14.6
+
+# NVD Enrichment
+nvdlib>=0.7.6
 
 # Testing
 pytest==8.1.1

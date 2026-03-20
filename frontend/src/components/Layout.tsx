@@ -80,7 +80,7 @@ export function Layout({ children }: LayoutProps) {
       <aside className="hidden lg:flex w-60 flex-col border-r border-slate-800 bg-slate-900">
         <div className="flex h-16 items-center gap-2 border-b border-slate-800 px-4">
           <ShieldCheck className="h-6 w-6 text-blue-500" />
-          <span className="font-bold text-slate-100">CyberReport Pro</span>
+          <span className="font-bold text-slate-100">ReportShelter PRO</span>
         </div>
         <div className="flex flex-1 flex-col gap-4 p-4 overflow-y-auto">
           <NavLinks />
@@ -110,7 +110,7 @@ export function Layout({ children }: LayoutProps) {
             <div className="flex h-16 items-center justify-between border-b border-slate-800 px-4">
               <div className="flex items-center gap-2">
                 <ShieldCheck className="h-6 w-6 text-blue-500" />
-                <span className="font-bold text-slate-100">CyberReport Pro</span>
+                <span className="font-bold text-slate-100">ReportShelter PRO</span>
               </div>
               <button
                 onClick={() => setMobileOpen(false)}
@@ -150,7 +150,7 @@ export function Layout({ children }: LayoutProps) {
           </button>
           <div className="ml-3 flex items-center gap-2">
             <ShieldCheck className="h-5 w-5 text-blue-500" />
-            <span className="font-bold text-sm text-slate-100">CyberReport Pro</span>
+            <span className="font-bold text-sm text-slate-100">ReportShelter PRO</span>
           </div>
         </header>
 
