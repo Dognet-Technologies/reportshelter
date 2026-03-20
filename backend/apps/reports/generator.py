@@ -14,7 +14,7 @@ from django.conf import settings
 from django.template.loader import render_to_string
 
 from apps.vulnerabilities.deduplication import build_timeline
-from apps.vulnerabilities.models import Vulnerability
+from apps.vulnerabilities.models import RISK_LEVEL_ORDER, Vulnerability
 
 from .charts import host_bar_chart, risk_matrix_chart, severity_pie_chart, timeline_chart
 from .models import ReportExport
@@ -186,7 +186,16 @@ class ReportGenerator:
         if severity_filter:
             qs = qs.filter(risk_level__in=severity_filter)
 
-        return list(qs.order_by("-risk_score", "-cvss_score", "title"))
+        from django.db.models import F
+
+        return list(
+            qs.annotate(risk_level_order=RISK_LEVEL_ORDER).order_by(
+                F("risk_score").desc(nulls_last=True),
+                F("cvss_score").desc(nulls_last=True),
+                "risk_level_order",
+                "title",
+            )
+        )
 
     def _get_enabled_sections(self) -> set[str]:
         """
