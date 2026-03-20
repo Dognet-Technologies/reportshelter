@@ -22,6 +22,7 @@ import {
   useSubProject, useVulnerabilities, useUploadScan, useScanImports,
   useReportExports, useScreenshots, useUploadScreenshot, useLicenseStatus,
 } from "@/api/hooks";
+import { downloadReport } from "@/api/download";
 import { useQueryClient } from "@tanstack/react-query";
 import { Layout } from "@/components/Layout";
 import { VulnerabilityTable } from "@/components/VulnerabilityTable";
@@ -760,8 +761,13 @@ export default function SubProjectPage() {
                       <span className="text-xs text-slate-300 uppercase">{exp.format}</span>
                       <span className="text-xs text-slate-500">{format(new Date(exp.created_at),"MMM d")}</span>
                     </div>
-                    {exp.status === "done" && exp.file_url && (
-                      <a href={`${import.meta.env.VITE_API_BASE_URL ?? "/api/v1"}/reports/exports/${exp.id}/download/`} download className="btn-secondary text-xs py-1"><Download className="h-3 w-3" /></a>
+                    {exp.status === "done" && (
+                      <button
+                        onClick={() => downloadReport(exp.id, exp.format).catch(() => toast.error("Download failed."))}
+                        className="btn-secondary text-xs py-1"
+                      >
+                        <Download className="h-3 w-3" />
+                      </button>
                     )}
                   </div>
                 ))}
