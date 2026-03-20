@@ -10,11 +10,14 @@ from .models import ScanImport, Vulnerability
 class VulnerabilitySerializer(serializers.ModelSerializer):
     """Full serializer for Vulnerability."""
 
+    project_id = serializers.IntegerField(source="subproject.project_id", read_only=True)
+
     class Meta:
         model = Vulnerability
         fields = [
             "id",
             "subproject",
+            "project_id",
             "scan_import",
             "title",
             "description",

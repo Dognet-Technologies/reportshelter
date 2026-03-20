@@ -553,6 +553,27 @@ export function useUploadScreenshot(projectId: number, subprojectId: number) {
   });
 }
 
+export function useUpdateScreenshot(subprojectId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Partial<Pick<Screenshot, "caption" | "order" | "vulnerability_ref">> }) =>
+      apiClient.patch<Screenshot>(`/screenshots/${id}/`, data).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.screenshots(subprojectId) });
+    },
+  });
+}
+
+export function useDeleteScreenshot(subprojectId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => apiClient.delete(`/screenshots/${id}/`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.screenshots(subprojectId) });
+    },
+  });
+}
+
 // ─── Organization hooks ──────────────────────────────────────────────────────
 
 export function useUpdateOrganization() {

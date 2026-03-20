@@ -83,10 +83,6 @@ class VulnerabilityDetailView(generics.RetrieveUpdateDestroyAPIView):
             subproject__project__organization=self.request.user.organization
         )
 
-    def update(self, request: Request, *args, **kwargs) -> Response:
-        return super().update(request, *args, partial=True, **kwargs)
-
-
 class ScanImportUploadView(APIView):
     """
     POST /api/v1/vulnerabilities/import/<subproject_pk>/
