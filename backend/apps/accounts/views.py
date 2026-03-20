@@ -690,19 +690,33 @@ class KillAllTasksView(APIView):
             subproject__project__organization=org,
             status__in=[ScanImport.Status.PENDING, ScanImport.Status.PROCESSING],
         )
-        count = active_qs.count()
+
+        try:
+            count = active_qs.count()
+        except Exception as exc:
+            logger.error("KillAllTasksView: DB error: %s", exc)
+            return Response({"detail": "Database error — run migrations."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
         if count == 0:
             return Response({"killed": 0, "message": "No active tasks found."})
 
-        # Collect task IDs before bulk-updating
-        task_ids = [t for t in active_qs.values_list("celery_task_id", flat=True) if t]
+        # Collect task IDs before bulk-updating (celery_task_id may not exist if migration not run)
+        task_ids: list[str] = []
+        try:
+            task_ids = [t for t in active_qs.values_list("celery_task_id", flat=True) if t]
+        except Exception:
+            pass  # Field not yet migrated — skip revoke, still mark failed
 
         # Mark all as failed at once
-        active_qs.update(
-            status=ScanImport.Status.FAILED,
-            error_message="Killed by admin.",
-            processed_at=tz.now(),
-        )
+        try:
+            active_qs.update(
+                status=ScanImport.Status.FAILED,
+                error_message="Killed by admin.",
+                processed_at=tz.now(),
+            )
+        except Exception as exc:
+            logger.error("KillAllTasksView: update error: %s", exc)
+            return Response({"detail": f"Update failed: {exc}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         # Revoke each known Celery task
         if task_ids:
