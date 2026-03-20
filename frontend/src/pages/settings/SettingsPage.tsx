@@ -2,7 +2,7 @@
  * Settings page: organization profile, logo upload, colors, legal disclaimer,
  * and license activation form.
  */
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import {
   Loader2,
@@ -18,6 +18,12 @@ import {
   Lock,
   Eye,
   EyeOff,
+  Database,
+  Info,
+  Download,
+  Trash2,
+  RefreshCw,
+  GitMerge,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -32,6 +38,7 @@ import {
   useUpdateOrganization,
   useLicenseStatus,
   useActivateLicense,
+  useDBStats,
 } from "@/api/hooks";
 import { Layout } from "@/components/Layout";
 import { useAuthStore } from "@/store/authStore";
@@ -714,9 +721,269 @@ function LicenseSection() {
   );
 }
 
+// ─── DB Management Section ────────────────────────────────────────────────────
+
+function DBManagementSection() {
+  const { data: dbStats, isLoading, refetch } = useDBStats();
+  const [resetConfirm, setResetConfirm] = useState("");
+  const [resetting, setResetting] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
+  async function handleExport() {
+    setExporting(true);
+    try {
+      const { apiClient } = await import("@/api/client");
+      const response = await apiClient.get("/auth/admin/db-export/", { responseType: "blob" });
+      const url = URL.createObjectURL(new Blob([response.data], { type: "application/json" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "reportshelter_export.json";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast.success("Export downloaded.");
+    } catch {
+      toast.error("Export failed.");
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  async function handleReset() {
+    if (resetConfirm !== "RESET") {
+      toast.error('Type "RESET" to confirm.');
+      return;
+    }
+    setResetting(true);
+    try {
+      const { apiClient } = await import("@/api/client");
+      await apiClient.post("/auth/admin/db-reset/", { confirm: "RESET" });
+      toast.success("All project data has been deleted.");
+      setResetConfirm("");
+      refetch();
+    } catch {
+      toast.error("Reset failed.");
+    } finally {
+      setResetting(false);
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Status */}
+      <div className="card space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-slate-100 flex items-center gap-2">
+            <Database className="h-4 w-4" />
+            Database Status
+          </h3>
+          <button onClick={() => refetch()} className="btn-secondary text-xs py-1 px-2">
+            <RefreshCw className="h-3 w-3" />
+            Refresh
+          </button>
+        </div>
+
+        {isLoading ? (
+          <div className="flex items-center gap-2 text-slate-500 text-sm">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading…
+          </div>
+        ) : dbStats ? (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-slate-400">Total size:</span>
+              <span className="text-slate-100 font-mono font-semibold">{dbStats.db_size ?? "N/A"}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {Object.entries(dbStats.counts).map(([key, count]) => (
+                <div key={key} className="rounded-md bg-slate-800 px-3 py-2">
+                  <div className="text-xs text-slate-500 capitalize">{key.replace(/_/g, " ")}</div>
+                  <div className="text-lg font-bold text-slate-100">{count as number}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      {/* Export */}
+      <div className="card space-y-3">
+        <h3 className="font-semibold text-slate-100 flex items-center gap-2">
+          <Download className="h-4 w-4" />
+          Export Data
+        </h3>
+        <p className="text-sm text-slate-400">
+          Download a full JSON export of all your organization's data (projects, vulnerabilities, users).
+        </p>
+        <button onClick={handleExport} disabled={exporting} className="btn-secondary">
+          {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+          Export JSON
+        </button>
+      </div>
+
+      {/* Reset */}
+      <div className="card space-y-3 border border-red-900/50">
+        <h3 className="font-semibold text-red-400 flex items-center gap-2">
+          <Trash2 className="h-4 w-4" />
+          Reset Database
+        </h3>
+        <p className="text-sm text-slate-400">
+          Permanently delete all projects, subprojects and vulnerabilities for this organization.
+          Users and organization settings are preserved. <strong className="text-red-400">This cannot be undone.</strong>
+        </p>
+        <div className="flex gap-3 items-center">
+          <input
+            value={resetConfirm}
+            onChange={(e) => setResetConfirm(e.target.value)}
+            className="input w-40 font-mono"
+            placeholder='Type "RESET"'
+          />
+          <button
+            onClick={handleReset}
+            disabled={resetting || resetConfirm !== "RESET"}
+            className="btn-primary bg-red-600 hover:bg-red-700 disabled:opacity-40"
+          >
+            {resetting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+            Reset
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── About Section ────────────────────────────────────────────────────────────
+
+function AboutSection() {
+  const [sysInfo, setSysInfo] = useState<{
+    version: string;
+    git_commit: string;
+    git_date: string;
+    repo_url: string;
+  } | null>(null);
+  const [loadingInfo, setLoadingInfo] = useState(false);
+  const [updating, setUpdating] = useState(false);
+  const [updateOutput, setUpdateOutput] = useState<string | null>(null);
+
+  async function loadInfo() {
+    setLoadingInfo(true);
+    try {
+      const { apiClient } = await import("@/api/client");
+      const res = await apiClient.get("/auth/admin/system-info/");
+      setSysInfo(res.data);
+    } catch {
+      toast.error("Failed to load system info.");
+    } finally {
+      setLoadingInfo(false);
+    }
+  }
+
+  async function handleUpdate() {
+    setUpdating(true);
+    setUpdateOutput(null);
+    try {
+      const { apiClient } = await import("@/api/client");
+      const res = await apiClient.post("/auth/admin/system-update/");
+      setUpdateOutput(res.data.output);
+      if (res.data.success) {
+        toast.success("Update complete. Restart the application to apply changes.");
+      } else {
+        toast.error("Update finished with errors.");
+      }
+    } catch {
+      toast.error("Update failed.");
+    } finally {
+      setUpdating(false);
+    }
+  }
+
+  // Load on mount
+  useEffect(() => { loadInfo(); }, []);
+
+  return (
+    <div className="space-y-6">
+      {/* Version info */}
+      <div className="card space-y-4">
+        <h3 className="font-semibold text-slate-100 flex items-center gap-2">
+          <Info className="h-4 w-4" />
+          Application Info
+        </h3>
+        {loadingInfo ? (
+          <div className="flex items-center gap-2 text-slate-500 text-sm">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading…
+          </div>
+        ) : sysInfo ? (
+          <div className="space-y-2 text-sm">
+            <div className="flex gap-3">
+              <span className="text-slate-400 w-28 shrink-0">Version</span>
+              <span className="text-slate-100 font-semibold">{sysInfo.version}</span>
+            </div>
+            <div className="flex gap-3">
+              <span className="text-slate-400 w-28 shrink-0">Git commit</span>
+              <code className="text-slate-100 font-mono text-xs bg-slate-800 px-2 py-0.5 rounded">
+                {sysInfo.git_commit}
+              </code>
+            </div>
+            <div className="flex gap-3">
+              <span className="text-slate-400 w-28 shrink-0">Commit date</span>
+              <span className="text-slate-100 text-xs">{sysInfo.git_date}</span>
+            </div>
+            <div className="flex gap-3">
+              <span className="text-slate-400 w-28 shrink-0">Repository</span>
+              <a
+                href={sysInfo.repo_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-400 hover:text-blue-300 text-xs break-all"
+              >
+                {sysInfo.repo_url}
+              </a>
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      {/* Update */}
+      <div className="card space-y-4">
+        <h3 className="font-semibold text-slate-100 flex items-center gap-2">
+          <GitMerge className="h-4 w-4" />
+          Update Application
+        </h3>
+        <p className="text-sm text-slate-400">
+          Pull the latest stable release from the official repository.
+          After updating, restart the Docker containers to apply changes.
+        </p>
+        <button onClick={handleUpdate} disabled={updating} className="btn-primary">
+          {updating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+          {updating ? "Updating…" : "Pull latest update"}
+        </button>
+        {updateOutput && (
+          <pre className="mt-3 rounded-md bg-slate-900 border border-slate-700 p-3 text-xs text-slate-300 overflow-auto max-h-48 whitespace-pre-wrap">
+            {updateOutput}
+          </pre>
+        )}
+      </div>
+
+      {/* Credits */}
+      <div className="card space-y-2 text-sm text-slate-400">
+        <h3 className="font-semibold text-slate-100">Credits</h3>
+        <p>ReportShelter PRO — Professional Cybersecurity Report Generator</p>
+        <p>
+          Developed by{" "}
+          <a href="https://dognet-technologies.online" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">
+            Dognet Technologies
+          </a>
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-type SettingsTab = "profile" | "organization" | "license";
+type SettingsTab = "profile" | "organization" | "license" | "database" | "about";
 
 export default function SettingsPage() {
   const [tab, setTab] = useState<SettingsTab>("profile");
@@ -725,6 +992,8 @@ export default function SettingsPage() {
     { key: "profile", label: "Profile", icon: <User className="h-4 w-4" /> },
     { key: "organization", label: "Organization", icon: <Building2 className="h-4 w-4" /> },
     { key: "license", label: "License", icon: <Shield className="h-4 w-4" /> },
+    { key: "database", label: "Database", icon: <Database className="h-4 w-4" /> },
+    { key: "about", label: "About", icon: <Info className="h-4 w-4" /> },
   ];
 
   return (
@@ -758,6 +1027,8 @@ export default function SettingsPage() {
         {tab === "profile" && <ProfileSection />}
         {tab === "organization" && <OrganizationSection />}
         {tab === "license" && <LicenseSection />}
+        {tab === "database" && <DBManagementSection />}
+        {tab === "about" && <AboutSection />}
       </div>
     </Layout>
   );

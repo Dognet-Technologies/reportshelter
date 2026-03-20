@@ -7,6 +7,7 @@ import { z } from "zod";
 import { Link, useNavigate } from "react-router-dom";
 import { ShieldCheck, Loader2, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
+import iconUrl from "@/components/Icon.png";
 import toast from "react-hot-toast";
 import { apiClient } from "@/api/client";
 import { useAuthStore } from "@/store/authStore";
@@ -36,8 +37,8 @@ function LoginLogo() {
   if (!imgError) {
     return (
       <img
-        src="/logo.png"
-        alt="CyberReport Pro"
+        src={iconUrl}
+        alt="ReportShelter PRO"
         className="h-16 w-auto mb-3 object-contain"
         onError={() => setImgError(true)}
       />
@@ -88,7 +89,7 @@ export default function LoginPage() {
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
           <LoginLogo />
-          <h1 className="text-2xl font-bold text-slate-100">CyberReport Pro</h1>
+          <h1 className="text-2xl font-bold text-slate-100">ReportShelter PRO</h1>
           <p className="text-slate-400 text-sm mt-1">Sign in to your account</p>
         </div>
 

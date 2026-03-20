@@ -517,3 +517,189 @@ class AuditLogView(generics.ListAPIView):
 
     def get_queryset(self):
         return AuditLog.objects.filter(organization=self.request.user.organization).order_by("-created_at")
+
+
+# ---------------------------------------------------------------------------
+# System admin views (DB stats, export, reset, system info, update)
+# ---------------------------------------------------------------------------
+
+
+class DBStatsView(APIView):
+    """
+    GET /auth/admin/db-stats/
+    Return database size and row counts for the current organization (admin only).
+    """
+
+    permission_classes = [permissions.IsAuthenticated, IsOrgAdmin]
+
+    def get(self, request: Request) -> Response:
+        from django.db import connection
+
+        org = request.user.organization
+
+        # Collect row counts per model within this org
+        from apps.projects.models import Project, SubProject
+        from apps.vulnerabilities.models import Vulnerability, ScanImport
+
+        counts = {
+            "projects": Project.objects.filter(organization=org).count(),
+            "subprojects": SubProject.objects.filter(project__organization=org).count(),
+            "vulnerabilities": Vulnerability.objects.filter(subproject__project__organization=org).count(),
+            "scan_imports": ScanImport.objects.filter(subproject__project__organization=org).count(),
+            "users": User.objects.filter(organization=org).count(),
+        }
+
+        # Fetch total DB size (PostgreSQL)
+        db_size = None
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT pg_size_pretty(pg_database_size(current_database()))")
+                row = cursor.fetchone()
+                if row:
+                    db_size = row[0]
+        except Exception:
+            db_size = "N/A"
+
+        return Response({"counts": counts, "db_size": db_size})
+
+
+class DBExportView(APIView):
+    """
+    GET /auth/admin/db-export/
+    Export all organization data as JSON (admin only).
+    """
+
+    permission_classes = [permissions.IsAuthenticated, IsOrgAdmin]
+
+    def get(self, request: Request) -> Response:
+        import json as _json
+
+        from django.http import HttpResponse
+        from django.core import serializers as dj_serializers
+
+        org = request.user.organization
+
+        from apps.projects.models import Project, SubProject
+        from apps.vulnerabilities.models import Vulnerability, ScanImport
+
+        qs_list = [
+            Organization.objects.filter(pk=org.pk),
+            User.objects.filter(organization=org),
+            Project.objects.filter(organization=org),
+            SubProject.objects.filter(project__organization=org),
+            ScanImport.objects.filter(subproject__project__organization=org),
+            Vulnerability.objects.filter(subproject__project__organization=org),
+        ]
+
+        combined: list = []
+        for qs in qs_list:
+            data = _json.loads(dj_serializers.serialize("json", qs))
+            combined.extend(data)
+
+        payload = _json.dumps(combined, indent=2, default=str)
+        response = HttpResponse(payload, content_type="application/json")
+        response["Content-Disposition"] = 'attachment; filename="reportshelter_export.json"'
+        return response
+
+
+class DBResetView(APIView):
+    """
+    POST /auth/admin/db-reset/
+    Delete all organization data except users and org record (admin only).
+    Requires { "confirm": "RESET" } in body.
+    """
+
+    permission_classes = [permissions.IsAuthenticated, IsOrgAdmin]
+
+    def post(self, request: Request) -> Response:
+        if request.data.get("confirm") != "RESET":
+            return Response(
+                {"error": "Send { \"confirm\": \"RESET\" } to confirm."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        org = request.user.organization
+
+        from apps.projects.models import Project
+
+        deleted_count, _ = Project.objects.filter(organization=org).delete()
+
+        logger.warning(
+            "DB reset performed by %s for org %s — %d project(s) deleted.",
+            request.user.email,
+            org.name,
+            deleted_count,
+        )
+
+        return Response({"success": True, "deleted_projects": deleted_count})
+
+
+class SystemInfoView(APIView):
+    """
+    GET /auth/admin/system-info/
+    Return application version and git commit info (admin only).
+    """
+
+    permission_classes = [permissions.IsAuthenticated, IsOrgAdmin]
+
+    def get(self, request: Request) -> Response:
+        import subprocess
+        import os
+
+        repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+
+        git_commit = "unknown"
+        git_date = "unknown"
+        try:
+            git_commit = subprocess.check_output(
+                ["git", "-C", repo_root, "rev-parse", "--short", "HEAD"],
+                stderr=subprocess.DEVNULL,
+                timeout=5,
+            ).decode().strip()
+            git_date = subprocess.check_output(
+                ["git", "-C", repo_root, "log", "-1", "--format=%ci"],
+                stderr=subprocess.DEVNULL,
+                timeout=5,
+            ).decode().strip()
+        except Exception:
+            pass
+
+        return Response({
+            "version": "1.0.0",
+            "git_commit": git_commit,
+            "git_date": git_date,
+            "repo_url": "https://github.com/Dognet-Technologies/reportshelter.git",
+        })
+
+
+class SystemUpdateView(APIView):
+    """
+    POST /auth/admin/system-update/
+    Pull latest changes from the stable branch (admin only).
+    """
+
+    permission_classes = [permissions.IsAuthenticated, IsOrgAdmin]
+
+    def post(self, request: Request) -> Response:
+        import subprocess
+        import os
+
+        repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+
+        try:
+            result = subprocess.run(
+                ["git", "-C", repo_root, "pull", "origin", "main"],
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            output = result.stdout + result.stderr
+            success = result.returncode == 0
+        except subprocess.TimeoutExpired:
+            return Response({"error": "Update timed out."}, status=status.HTTP_408_REQUEST_TIMEOUT)
+        except Exception as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        logger.info("System update triggered by %s: %s", request.user.email, output)
+
+        return Response({"success": success, "output": output})
