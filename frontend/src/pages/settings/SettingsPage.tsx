@@ -24,6 +24,7 @@ import {
   Trash2,
   RefreshCw,
   GitMerge,
+  X,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -727,6 +728,7 @@ function DBManagementSection() {
   const { data: dbStats, isLoading, refetch } = useDBStats();
   const [resetConfirm, setResetConfirm] = useState("");
   const [resetting, setResetting] = useState(false);
+  const [killing, setKilling] = useState(false);
   const [exporting, setExporting] = useState(false);
 
   async function handleExport() {
@@ -766,6 +768,25 @@ function DBManagementSection() {
       toast.error("Reset failed.");
     } finally {
       setResetting(false);
+    }
+  }
+
+  async function handleKillAll() {
+    setKilling(true);
+    try {
+      const { apiClient } = await import("@/api/client");
+      const res = await apiClient.post("/auth/admin/kill-all-tasks/");
+      const { killed } = res.data as { killed: number; message: string };
+      if (killed === 0) {
+        toast("No active tasks found.");
+      } else {
+        toast.success(`${killed} task(s) cancelled.`);
+      }
+      refetch();
+    } catch {
+      toast.error("Kill failed.");
+    } finally {
+      setKilling(false);
     }
   }
 
@@ -819,6 +840,27 @@ function DBManagementSection() {
         <button onClick={handleExport} disabled={exporting} className="btn-secondary">
           {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
           Export JSON
+        </button>
+      </div>
+
+      {/* Kill All Tasks */}
+      <div className="card space-y-3 border border-amber-900/50">
+        <h3 className="font-semibold text-amber-400 flex items-center gap-2">
+          <X className="h-4 w-4" />
+          Kill All Active Tasks
+        </h3>
+        <p className="text-sm text-slate-400">
+          Immediately cancel all imports currently in <strong className="text-amber-300">Pending</strong> or{" "}
+          <strong className="text-amber-300">Processing</strong> state.
+          Use this if tasks appear stuck and cannot be cancelled individually.
+        </p>
+        <button
+          onClick={handleKillAll}
+          disabled={killing}
+          className="btn-primary bg-amber-600 hover:bg-amber-700"
+        >
+          {killing ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
+          {killing ? "Cancelling…" : "Kill All Active Tasks"}
         </button>
       </div>
 

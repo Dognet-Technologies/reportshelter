@@ -199,6 +199,57 @@ class ScanImportDetailView(generics.RetrieveAPIView):
         )
 
 
+class ScanImportCancelView(APIView):
+    """
+    POST /api/v1/vulnerabilities/imports/<pk>/cancel/
+    Cancel a pending or processing scan import.
+    Marks the record as failed and revokes the Celery task if possible.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request: Request, pk: int) -> Response:
+        scan_import = get_object_or_404(
+            ScanImport,
+            pk=pk,
+            subproject__project__organization=request.user.organization,
+        )
+
+        if scan_import.status == ScanImport.Status.DONE:
+            return Response(
+                {"detail": "Import already completed — cannot cancel."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if scan_import.status == ScanImport.Status.FAILED:
+            return Response(
+                {"detail": "Import already in failed state."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Mark as failed immediately so the task won't call mark_done
+        scan_import.mark_failed("Cancelled by user.")
+
+        # Revoke the Celery task if we have its ID
+        if scan_import.celery_task_id:
+            try:
+                from config.celery import app as celery_app
+                celery_app.control.revoke(
+                    scan_import.celery_task_id,
+                    terminate=True,
+                    signal="SIGTERM",
+                )
+                logger.info(
+                    "Revoked Celery task %s for ScanImport %s.",
+                    scan_import.celery_task_id,
+                    pk,
+                )
+            except Exception as exc:
+                logger.warning("Could not revoke Celery task: %s", exc)
+
+        return Response(ScanImportSerializer(scan_import).data)
+
+
 class ScanImportRetryView(APIView):
     """
     POST /api/v1/vulnerabilities/imports/<pk>/retry/

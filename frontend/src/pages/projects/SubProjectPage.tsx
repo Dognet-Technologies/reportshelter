@@ -14,13 +14,14 @@ import { useDropzone } from "react-dropzone";
 import {
   Upload, Loader2, FileText, Download, Image, AlertCircle, CheckCircle2,
   Clock, RefreshCw, Plus, ChevronRight, ChevronLeft, BarChart2, Palette, Info,
-  Database, ChevronDown, ChevronUp,
+  Database, ChevronDown, ChevronUp, X,
 } from "lucide-react";
 import { format } from "date-fns";
 import toast from "react-hot-toast";
 import {
   useSubProject, useVulnerabilities, useUploadScan, useScanImports,
-  useReportExports, useScreenshots, useUploadScreenshot, useLicenseStatus, useRetryScanImport,
+  useReportExports, useScreenshots, useUploadScreenshot, useLicenseStatus,
+  useRetryScanImport, useCancelScanImport,
 } from "@/api/hooks";
 import { downloadReport } from "@/api/download";
 import { useQueryClient } from "@tanstack/react-query";
@@ -428,6 +429,7 @@ interface ScansPanelProps {
 function ScansPanel({ subprojectId, selectedScanIds, onSelectionChange, canImport }: ScansPanelProps) {
   const { data: imports, isLoading } = useScanImports(subprojectId);
   const retry = useRetryScanImport(subprojectId);
+  const cancel = useCancelScanImport(subprojectId);
   const [scannerType, setScannerType] = useState("nmap");
   const upload = useUploadScan(subprojectId);
   const qc = useQueryClient();
@@ -520,11 +522,21 @@ function ScansPanel({ subprojectId, selectedScanIds, onSelectionChange, canImpor
                     {(imp.status === "failed" || imp.status === "processing") && (
                       <button
                         onClick={() => retry.mutate(imp.id, { onSuccess: () => toast.success("Re-queued."), onError: () => toast.error("Retry failed.") })}
-                        disabled={retry.isPending}
+                        disabled={retry.isPending || cancel.isPending}
                         className="ml-1 text-slate-400 hover:text-blue-400 transition-colors"
                         title="Retry import"
                       >
-                        {retry.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                        <RefreshCw className="h-3 w-3" />
+                      </button>
+                    )}
+                    {(imp.status === "pending" || imp.status === "processing") && (
+                      <button
+                        onClick={() => cancel.mutate(imp.id, { onSuccess: () => toast.success("Import cancelled."), onError: () => toast.error("Cancel failed.") })}
+                        disabled={cancel.isPending || retry.isPending}
+                        className="ml-1 text-slate-400 hover:text-red-400 transition-colors"
+                        title="Cancel import"
+                      >
+                        {cancel.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <X className="h-3 w-3" />}
                       </button>
                     )}
                   </div>

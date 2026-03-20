@@ -672,6 +672,56 @@ class SystemInfoView(APIView):
         })
 
 
+class KillAllTasksView(APIView):
+    """
+    POST /auth/admin/kill-all-tasks/
+    Cancel all pending and processing scan imports for this organization.
+    Marks them as failed and revokes Celery tasks (admin only).
+    """
+
+    permission_classes = [permissions.IsAuthenticated, IsOrgAdmin]
+
+    def post(self, request: Request) -> Response:
+        from apps.vulnerabilities.models import ScanImport
+        from django.utils import timezone as tz
+
+        org = request.user.organization
+        active_qs = ScanImport.objects.filter(
+            subproject__project__organization=org,
+            status__in=[ScanImport.Status.PENDING, ScanImport.Status.PROCESSING],
+        )
+        count = active_qs.count()
+        if count == 0:
+            return Response({"killed": 0, "message": "No active tasks found."})
+
+        # Collect task IDs before bulk-updating
+        task_ids = [t for t in active_qs.values_list("celery_task_id", flat=True) if t]
+
+        # Mark all as failed at once
+        active_qs.update(
+            status=ScanImport.Status.FAILED,
+            error_message="Killed by admin.",
+            processed_at=tz.now(),
+        )
+
+        # Revoke each known Celery task
+        if task_ids:
+            try:
+                from config.celery import app as celery_app
+                for task_id in task_ids:
+                    celery_app.control.revoke(task_id, terminate=True, signal="SIGTERM")
+            except Exception as exc:
+                logger.warning("Could not revoke Celery tasks: %s", exc)
+
+        logger.warning(
+            "Kill-all triggered by %s for org %s: %d task(s) cancelled.",
+            request.user.email,
+            org.name,
+            count,
+        )
+        return Response({"killed": count, "message": f"{count} task(s) cancelled."})
+
+
 class SystemUpdateView(APIView):
     """
     POST /auth/admin/system-update/

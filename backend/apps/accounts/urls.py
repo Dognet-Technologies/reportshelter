@@ -37,5 +37,6 @@ urlpatterns = [
     path("admin/db-export/", views.DBExportView.as_view(), name="db-export"),
     path("admin/db-reset/", views.DBResetView.as_view(), name="db-reset"),
     path("admin/system-info/", views.SystemInfoView.as_view(), name="system-info"),
+    path("admin/kill-all-tasks/", views.KillAllTasksView.as_view(), name="kill-all-tasks"),
     path("admin/system-update/", views.SystemUpdateView.as_view(), name="system-update"),
 ]
