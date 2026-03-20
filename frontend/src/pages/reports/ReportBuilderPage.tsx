@@ -202,8 +202,10 @@ export default function ReportBuilderPage() {
   const [format, setFormat] = useState<ReportFormat>("pdf");
   const [reportType, setReportType] = useState<ReportTypeId | "">("");
   const [orderedSections, setOrderedSections] = useState<string[]>(REPORT_SECTIONS.map((s) => s.id));
+  // Default: all sections enabled. Selecting a Report Type overrides this with
+  // a type-specific preset; the user can then fine-tune manually.
   const [enabledSections, setEnabledSections] = useState<Set<string>>(
-    new Set(REPORT_SECTIONS.filter((s) => s.required).map((s) => s.id))
+    new Set(REPORT_SECTIONS.map((s) => s.id))
   );
   const [selectedRiskLevels, setSelectedRiskLevels] = useState<string[]>([...RISK_LEVELS]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>(["open", "retest"]);
@@ -342,12 +344,12 @@ export default function ReportBuilderPage() {
                 </div>
               </div>
             ))}
-            {!reportType && (
-              <div className="flex items-center gap-2 mt-3 text-xs text-slate-500">
-                <Info className="h-3.5 w-3.5 shrink-0" />
-                Select a report type to auto-populate the sections below.
-              </div>
-            )}
+            <div className="flex items-center gap-2 mt-3 text-xs text-slate-500">
+              <Info className="h-3.5 w-3.5 shrink-0" />
+              {reportType
+                ? "Sections pre-selected for this report type — adjust below as needed."
+                : "Optional: select a type to apply a section preset. All sections are enabled by default."}
+            </div>
           </div>
 
           {/* 2. Report sections */}
