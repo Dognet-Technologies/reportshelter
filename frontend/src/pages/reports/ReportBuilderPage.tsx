@@ -14,7 +14,7 @@
  *     3. Generate button
  */
 import { useState, useCallback, useRef } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import {
   Loader2, FileText, Download, CheckCircle2, AlertCircle,
   RefreshCw, Clock, ChevronLeft, Eye, GripVertical, Info,
@@ -187,26 +187,56 @@ const FORMATS: { value: ReportFormat; label: string; desc: string }[] = [
   { value: "xml",  label: "XML",  desc: "Structured data for interoperability" },
 ];
 
+// Config passed from SubProjectPage via router state.
+interface IncomingConfig {
+  reportType?: ReportTypeId;
+  audience?: string[];
+  style?: Record<string, string>;
+  extra?: Record<string, unknown>;
+}
+
+function initFromConfig(config: IncomingConfig | undefined): {
+  reportType: ReportTypeId | "";
+  orderedSections: string[];
+  enabledSections: Set<string>;
+} {
+  if (config?.reportType) {
+    const defaults = getDefaultSections(config.reportType);
+    const allIds = REPORT_SECTIONS.map((s) => s.id);
+    const sorted = [...defaults, ...allIds.filter((id) => !defaults.includes(id))];
+    return {
+      reportType: config.reportType,
+      orderedSections: sorted,
+      enabledSections: new Set([...defaults, ...REPORT_SECTIONS.filter((s) => s.required).map((s) => s.id)]),
+    };
+  }
+  return {
+    reportType: "",
+    orderedSections: REPORT_SECTIONS.map((s) => s.id),
+    enabledSections: new Set(REPORT_SECTIONS.map((s) => s.id)),
+  };
+}
+
 export default function ReportBuilderPage() {
   const { subprojectId, projectId } = useParams<{ subprojectId: string; projectId?: string }>();
   const spId = Number(subprojectId);
   const pId = Number(projectId ?? 0);
   const navigate = useNavigate();
+  const location = useLocation();
+  const incoming = (location.state ?? undefined) as IncomingConfig | undefined;
 
   const { data: subproject } = useSubProject(pId, spId);
   const { data: vulns } = useVulnerabilities(spId);
   const { data: license } = useLicenseStatus();
   const generateReport = useGenerateReport();
 
-  // ── State ──
+  // ── State — seeded from SubProjectPage config if available ──
   const [format, setFormat] = useState<ReportFormat>("pdf");
-  const [reportType, setReportType] = useState<ReportTypeId | "">("");
-  const [orderedSections, setOrderedSections] = useState<string[]>(REPORT_SECTIONS.map((s) => s.id));
-  // Default: all sections enabled. Selecting a Report Type overrides this with
-  // a type-specific preset; the user can then fine-tune manually.
-  const [enabledSections, setEnabledSections] = useState<Set<string>>(
-    new Set(REPORT_SECTIONS.map((s) => s.id))
-  );
+
+  const init = initFromConfig(incoming);
+  const [reportType, setReportType] = useState<ReportTypeId | "">(init.reportType);
+  const [orderedSections, setOrderedSections] = useState<string[]>(init.orderedSections);
+  const [enabledSections, setEnabledSections] = useState<Set<string>>(init.enabledSections);
   const [selectedRiskLevels, setSelectedRiskLevels] = useState<string[]>([...RISK_LEVELS]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>(["open", "retest"]);
   const [generatedExportId, setGeneratedExportId] = useState<number | null>(null);
