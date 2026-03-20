@@ -25,6 +25,27 @@ interface LoginResponse {
   must_change_password: boolean;
 }
 
+/**
+ * Logo shown above the login card.
+ * Tries to load /logo.png from the public folder.
+ * Falls back to the ShieldCheck icon if the file is missing.
+ * To use your own logo: place logo.png in frontend/public/.
+ */
+function LoginLogo() {
+  const [imgError, setImgError] = useState(false);
+  if (!imgError) {
+    return (
+      <img
+        src="/logo.png"
+        alt="CyberReport Pro"
+        className="h-16 w-auto mb-3 object-contain"
+        onError={() => setImgError(true)}
+      />
+    );
+  }
+  return <ShieldCheck className="h-12 w-12 text-blue-500 mb-3" />;
+}
+
 export default function LoginPage() {
   const navigate = useNavigate();
   const { setTokens, setUser } = useAuthStore();
@@ -66,7 +87,7 @@ export default function LoginPage() {
       <div className="card w-full max-w-md">
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <ShieldCheck className="h-12 w-12 text-blue-500 mb-3" />
+          <LoginLogo />
           <h1 className="text-2xl font-bold text-slate-100">CyberReport Pro</h1>
           <p className="text-slate-400 text-sm mt-1">Sign in to your account</p>
         </div>

@@ -106,14 +106,16 @@ def parse_scan_file(self, scan_import_id: int) -> dict:
 @shared_task(bind=True, max_retries=2, default_retry_delay=60)
 def enrich_vulnerabilities_with_nvd(self, vulnerability_ids: list[int]) -> dict:
     """
-    Enrich a list of Vulnerability records with CVSS data from NVD API v2.
+    Enrich Vulnerability records with CVSS (NVD) and EPSS (First.org) data.
 
-    For each unique CVE ID found among the given vulnerabilities:
-      - Fetch CVE data from NVD using nvdlib
-      - Update cvss_score and cvss_vector on matching DB records
+    Steps:
+      1. Fetch CVSS score + vector from NVD API v2 (via nvdlib) for each unique CVE.
+      2. Fetch EPSS scores from First.org EPSS API in bulk (up to 100 CVEs/request).
+      3. Persist all updates via bulk_update.
 
-    Rate limit: 5 req/30s without API key (6s delay), 50 req/30s with key (0.6s delay).
-    NVD_API_KEY can be set in .env for higher throughput.
+    Rate limits:
+      NVD: 5 req/30s without API key (6 s delay), 50 req/30s with key (0.6 s delay).
+      EPSS: public API, no key required, batched up to 100 CVEs per call.
     """
     import os
     import time
@@ -121,8 +123,7 @@ def enrich_vulnerabilities_with_nvd(self, vulnerability_ids: list[int]) -> dict:
     try:
         import nvdlib
     except ImportError:
-        logger.warning("nvdlib not installed — skipping NVD enrichment. "
-                       "Install with: pip install nvdlib>=0.7.6")
+        logger.warning("nvdlib not installed — skipping NVD enrichment.")
         return {"skipped": True, "reason": "nvdlib not installed"}
 
     from apps.vulnerabilities.models import Vulnerability
@@ -132,30 +133,28 @@ def enrich_vulnerabilities_with_nvd(self, vulnerability_ids: list[int]) -> dict:
         return {"enriched": 0}
 
     api_key = os.environ.get("NVD_API_KEY", "")
-    delay = 0.6 if api_key else 6.0
+    nvd_delay = 0.6 if api_key else 6.0
 
-    # Collect unique CVE IDs
+    # Build map: cve_id → [Vulnerability, ...]
     unique_cves: dict[str, list[Vulnerability]] = {}
     for v in vulns:
-        # cve_id may be comma-separated list
         for cve in [c.strip() for c in v.cve_id.split(",") if c.strip()]:
             unique_cves.setdefault(cve, []).append(v)
 
-    enriched_count = 0
+    # ── Step 1: CVSS from NVD ──────────────────────────────────────────────────
+    cvss_map: dict[str, tuple[float, str]] = {}   # cve_id → (score, vector)
     failed_cves: list[str] = []
 
-    for cve_id, cve_vulns in unique_cves.items():
+    for cve_id in unique_cves:
         try:
             kwargs = {"cveId": cve_id, "key": api_key} if api_key else {"cveId": cve_id}
             results = list(nvdlib.searchCVE(**kwargs))
-
             if not results:
                 logger.debug("NVD: no data for %s", cve_id)
+                time.sleep(nvd_delay)
                 continue
 
             cve_obj = results[0]
-
-            # Extract best available CVSS score (prefer v3.1 > v3.0 > v2)
             cvss_score: float | None = None
             cvss_vector: str = ""
 
@@ -164,44 +163,90 @@ def enrich_vulnerabilities_with_nvd(self, vulnerability_ids: list[int]) -> dict:
                 for metric_key in ("cvssMetricV31", "cvssMetricV30", "cvssMetricV2"):
                     metric_list = getattr(metrics, metric_key, [])
                     if metric_list:
-                        m = metric_list[0]
-                        cvss_data = getattr(m, "cvssData", None)
+                        cvss_data = getattr(metric_list[0], "cvssData", None)
                         if cvss_data:
                             cvss_score = getattr(cvss_data, "baseScore", None)
                             cvss_vector = getattr(cvss_data, "vectorString", "") or ""
                         if cvss_score is not None:
                             break
 
-            if cvss_score is None:
-                logger.debug("NVD: no CVSS data for %s", cve_id)
-                continue
-
-            # Update all DB vulnerabilities that reference this CVE
-            to_update: list[Vulnerability] = []
-            for v in cve_vulns:
-                if v.cvss_score is None:
-                    v.cvss_score = float(cvss_score)
-                    v.cvss_vector = cvss_vector
-                    to_update.append(v)
-
-            if to_update:
-                Vulnerability.objects.bulk_update(to_update, ["cvss_score", "cvss_vector", "risk_score"])
-                enriched_count += len(to_update)
-                logger.info("NVD enriched %d records for %s (CVSS %.1f)", len(to_update), cve_id, cvss_score)
+            if cvss_score is not None:
+                cvss_map[cve_id] = (float(cvss_score), cvss_vector)
+                logger.debug("NVD: %s → CVSS %.1f", cve_id, cvss_score)
 
         except Exception as exc:
             failed_cves.append(cve_id)
-            logger.warning("NVD enrichment failed for %s: %s", cve_id, exc)
+            logger.warning("NVD fetch failed for %s: %s", cve_id, exc)
 
-        # Rate limit
-        time.sleep(delay)
+        time.sleep(nvd_delay)
+
+    # ── Step 2: EPSS from First.org (batch, up to 100 CVEs per request) ───────
+    epss_map: dict[str, float] = {}   # cve_id → epss_score (0–1)
+    cve_list = list(unique_cves.keys())
+
+    try:
+        import urllib.request
+        import json as _json
+
+        EPSS_URL = "https://api.first.org/data/1.0/epss"
+        BATCH = 100
+
+        for i in range(0, len(cve_list), BATCH):
+            batch = cve_list[i : i + BATCH]
+            params = "&".join(f"cve={c}" for c in batch)
+            url = f"{EPSS_URL}?{params}"
+            try:
+                req = urllib.request.Request(url, headers={"User-Agent": "CyberReportPro/1.0"})
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    payload = _json.loads(resp.read().decode())
+                for entry in payload.get("data", []):
+                    cve_id = entry.get("cve", "").upper()
+                    try:
+                        epss_map[cve_id] = float(entry.get("epss", 0))
+                    except (TypeError, ValueError):
+                        pass
+                logger.debug("EPSS: fetched %d scores (batch %d)", len(payload.get("data", [])), i // BATCH + 1)
+            except Exception as exc:
+                logger.warning("EPSS batch fetch failed (offset %d): %s", i, exc)
+
+    except Exception as exc:
+        logger.warning("EPSS enrichment error: %s", exc)
+
+    # ── Step 3: Apply updates ──────────────────────────────────────────────────
+    to_update: list[Vulnerability] = []
+    enriched_count = 0
+
+    for cve_id, cve_vulns in unique_cves.items():
+        cvss_entry = cvss_map.get(cve_id)
+        epss_val = epss_map.get(cve_id)
+
+        for v in cve_vulns:
+            changed = False
+            if cvss_entry and v.cvss_score is None:
+                v.cvss_score, v.cvss_vector = cvss_entry
+                changed = True
+            if epss_val is not None and v.epss_score is None:
+                v.epss_score = epss_val
+                changed = True
+            if changed:
+                # Recompute composite risk score
+                v.risk_score = v.compute_risk_score()
+                to_update.append(v)
+                enriched_count += 1
+
+    if to_update:
+        Vulnerability.objects.bulk_update(
+            to_update, ["cvss_score", "cvss_vector", "epss_score", "risk_score"]
+        )
 
     result = {
         "enriched": enriched_count,
         "cves_processed": len(unique_cves),
+        "cvss_found": len(cvss_map),
+        "epss_found": len(epss_map),
         "failed": failed_cves,
     }
-    logger.info("NVD enrichment complete: %s", result)
+    logger.info("NVD+EPSS enrichment complete: %s", result)
     return result
 
 
