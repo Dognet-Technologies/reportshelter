@@ -2,11 +2,14 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-COPY package.json ./
-RUN npm install
+COPY package.json package-lock.json* ./
+RUN npm ci
 
 COPY . .
 
 EXPOSE 5173
 
+# Ensure node_modules is populated even if the anonymous volume was
+# initialized before the image was built (common on first run / new machines).
+ENTRYPOINT ["sh", "-c", "[ -f node_modules/.package-lock.json ] || npm ci && exec \"$@\"", "--"]
 CMD ["npm", "run", "dev"]
