@@ -15,6 +15,7 @@ import string
 from django.core.management.base import BaseCommand
 
 from apps.accounts.models import Organization, User
+from apps.licensing.models import License
 
 
 class Command(BaseCommand):
@@ -63,6 +64,9 @@ class Command(BaseCommand):
             must_change_password=True,
             is_staff=True,
         )
+
+        # Create a trial license for the new organization
+        License.create_trial(org)
 
         self.stdout.write(self.style.SUCCESS("Default admin created successfully."))
         self.stdout.write(f"  Email:    {user.email}")
