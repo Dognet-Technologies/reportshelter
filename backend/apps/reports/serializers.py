@@ -45,13 +45,70 @@ class ReportGenerateSerializer(serializers.Serializer):
 
     subproject = serializers.IntegerField()
     format = serializers.ChoiceField(choices=ReportExport.Format.choices, default=ReportExport.Format.PDF)
-    vuln_status = serializers.ListField(
+
+    # Vulnerability filters
+    # Frontend sends "statuses"; accept both names for compatibility.
+    statuses = serializers.ListField(
         child=serializers.CharField(),
         required=False,
         help_text="Filter by vulnerability status (e.g. ['open', 'retest'])",
+    )
+    vuln_status = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        help_text="Alias for statuses (legacy).",
     )
     risk_levels = serializers.ListField(
         child=serializers.CharField(),
         required=False,
         help_text="Filter by risk level (e.g. ['critical', 'high'])",
+    )
+
+    # Report configuration
+    report_type = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        help_text="Report type ID (e.g. 'pentest', 'va', 'executive').",
+    )
+    sections = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        help_text="Ordered list of section IDs to include in the report.",
+    )
+    audience = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        default="technical",
+        help_text="Target audience: 'executive', 'management', or 'technical'.",
+    )
+
+    # Per-report visual overrides (from SubProjectPage StylePanel)
+    style = serializers.DictField(
+        child=serializers.CharField(allow_blank=True),
+        required=False,
+        help_text=(
+            "Visual overrides: primaryColor, secondaryColor, font, watermark, "
+            "borderRadius, titleSize, evidenceStyle."
+        ),
+    )
+
+    # Extra metadata (from SubProjectPage ExtraInfoPanel)
+    extra = serializers.DictField(
+        required=False,
+        help_text=(
+            "Extra metadata: classification, version, scope, engagement_type, "
+            "methodologies, authors, references."
+        ),
+    )
+
+    # Chart configuration (from SubProjectPage ChartsPanel)
+    charts_enabled = serializers.DictField(
+        child=serializers.BooleanField(),
+        required=False,
+        help_text="Which charts to generate, keyed by chart ID.",
+    )
+    charts_variants = serializers.DictField(
+        child=serializers.CharField(),
+        required=False,
+        help_text="Chart variant selection per chart ID (e.g. 'Donut', 'Pie').",
     )

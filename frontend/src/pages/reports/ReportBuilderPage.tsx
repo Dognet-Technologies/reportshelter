@@ -14,7 +14,7 @@
  *     3. Generate button
  */
 import { useState, useCallback, useRef } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import {
   Loader2, FileText, Download, CheckCircle2, AlertCircle,
   RefreshCw, Clock, ChevronLeft, Eye, GripVertical, Info,
@@ -187,26 +187,79 @@ const FORMATS: { value: ReportFormat; label: string; desc: string }[] = [
   { value: "xml",  label: "XML",  desc: "Structured data for interoperability" },
 ];
 
+// Config passed from SubProjectPage via router state.
+interface IncomingConfig {
+  reportType?: ReportTypeId;
+  audience?: string[];
+  style?: Record<string, string>;
+  extra?: Record<string, unknown>;
+  enabledCharts?: Record<string, boolean>;
+  chartVariants?: Record<string, string>;
+}
+
+/**
+ * Collapse the audience array (e.g. ["management","technical"]) to the single
+ * least-restrictive value so the template knows what to show.
+ * "technical" > "management" > "executive"
+ */
+function collapseAudience(arr: string[] | undefined): string {
+  if (!arr || arr.length === 0) return "technical";
+  if (arr.includes("technical")) return "technical";
+  if (arr.includes("management")) return "management";
+  return "executive";
+}
+
+function initFromConfig(config: IncomingConfig | undefined): {
+  reportType: ReportTypeId | "";
+  orderedSections: string[];
+  enabledSections: Set<string>;
+} {
+  if (config?.reportType) {
+    const defaults = getDefaultSections(config.reportType);
+    const allIds = REPORT_SECTIONS.map((s) => s.id);
+    const sorted = [...defaults, ...allIds.filter((id) => !defaults.includes(id))];
+    return {
+      reportType: config.reportType,
+      orderedSections: sorted,
+      enabledSections: new Set([...defaults, ...REPORT_SECTIONS.filter((s) => s.required).map((s) => s.id)]),
+    };
+  }
+  return {
+    reportType: "",
+    orderedSections: REPORT_SECTIONS.map((s) => s.id),
+    enabledSections: new Set(REPORT_SECTIONS.map((s) => s.id)),
+  };
+}
+
 export default function ReportBuilderPage() {
   const { subprojectId, projectId } = useParams<{ subprojectId: string; projectId?: string }>();
   const spId = Number(subprojectId);
   const pId = Number(projectId ?? 0);
   const navigate = useNavigate();
+  const location = useLocation();
+  const incoming = (location.state ?? undefined) as IncomingConfig | undefined;
 
   const { data: subproject } = useSubProject(pId, spId);
   const { data: vulns } = useVulnerabilities(spId);
   const { data: license } = useLicenseStatus();
   const generateReport = useGenerateReport();
 
-  // ── State ──
+  // ── State — seeded from SubProjectPage config if available ──
   const [format, setFormat] = useState<ReportFormat>("pdf");
-  const [reportType, setReportType] = useState<ReportTypeId | "">("");
-  const [orderedSections, setOrderedSections] = useState<string[]>(REPORT_SECTIONS.map((s) => s.id));
-  const [enabledSections, setEnabledSections] = useState<Set<string>>(
-    new Set(REPORT_SECTIONS.filter((s) => s.required).map((s) => s.id))
-  );
+
+  const init = initFromConfig(incoming);
+  const [reportType, setReportType] = useState<ReportTypeId | "">(init.reportType);
+  const [orderedSections, setOrderedSections] = useState<string[]>(init.orderedSections);
+  const [enabledSections, setEnabledSections] = useState<Set<string>>(init.enabledSections);
   const [selectedRiskLevels, setSelectedRiskLevels] = useState<string[]>([...RISK_LEVELS]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>(["open", "retest"]);
+
+  // Opaque config forwarded verbatim from SubProjectPage — no UI in Builder.
+  const rptAudience = collapseAudience(incoming?.audience);
+  const rptStyle = incoming?.style ?? undefined;
+  const rptExtra = incoming?.extra ?? undefined;
+  const rptChartsEnabled = incoming?.enabledCharts ?? undefined;
+  const rptChartsVariants = incoming?.chartVariants ?? undefined;
   const [generatedExportId, setGeneratedExportId] = useState<number | null>(null);
 
   const canExport = license?.is_active ?? false;
@@ -262,6 +315,11 @@ export default function ReportBuilderPage() {
         statuses: selectedStatuses,
         report_type: reportType || undefined,
         sections: orderedSections.filter((id) => enabledSections.has(id)),
+        audience: rptAudience,
+        ...(rptStyle         ? { style: rptStyle }                 : {}),
+        ...(rptExtra         ? { extra: rptExtra }                 : {}),
+        ...(rptChartsEnabled ? { charts_enabled: rptChartsEnabled } : {}),
+        ...(rptChartsVariants? { charts_variants: rptChartsVariants} : {}),
       });
       setGeneratedExportId(result.id);
       toast.success("Report generation started!");
@@ -342,12 +400,12 @@ export default function ReportBuilderPage() {
                 </div>
               </div>
             ))}
-            {!reportType && (
-              <div className="flex items-center gap-2 mt-3 text-xs text-slate-500">
-                <Info className="h-3.5 w-3.5 shrink-0" />
-                Select a report type to auto-populate the sections below.
-              </div>
-            )}
+            <div className="flex items-center gap-2 mt-3 text-xs text-slate-500">
+              <Info className="h-3.5 w-3.5 shrink-0" />
+              {reportType
+                ? "Sections pre-selected for this report type — adjust below as needed."
+                : "Optional: select a type to apply a section preset. All sections are enabled by default."}
+            </div>
           </div>
 
           {/* 2. Report sections */}

@@ -131,6 +131,7 @@ export type VulnStatus = "open" | "fixed" | "accepted" | "retest";
 export interface Vulnerability {
   id: number;
   subproject: number;
+  project_id: number;
   scan_import: number | null;
   title: string;
   description: string;

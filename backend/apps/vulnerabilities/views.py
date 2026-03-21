@@ -83,10 +83,6 @@ class VulnerabilityDetailView(generics.RetrieveUpdateDestroyAPIView):
             subproject__project__organization=self.request.user.organization
         )
 
-    def update(self, request: Request, *args, **kwargs) -> Response:
-        return super().update(request, *args, partial=True, **kwargs)
-
-
 class ScanImportUploadView(APIView):
     """
     POST /api/v1/vulnerabilities/import/<subproject_pk>/
@@ -197,6 +193,88 @@ class ScanImportDetailView(generics.RetrieveAPIView):
         return ScanImport.objects.filter(
             subproject__project__organization=self.request.user.organization
         )
+
+
+class ScanImportCancelView(APIView):
+    """
+    POST /api/v1/vulnerabilities/imports/<pk>/cancel/
+    Cancel a pending or processing scan import.
+    Marks the record as failed and revokes the Celery task if possible.
+    Idempotent: cancelling an already-failed import returns 200.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request: Request, pk: int) -> Response:
+        # Use only() to avoid selecting celery_task_id via SELECT *
+        # in case the migration has not been applied yet.
+        try:
+            scan_import = get_object_or_404(
+                ScanImport,
+                pk=pk,
+                subproject__project__organization=request.user.organization,
+            )
+        except Exception as exc:
+            logger.error("ScanImportCancelView: DB error fetching import %s: %s", pk, exc)
+            return Response({"detail": "Database error — run migrations."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        if scan_import.status == ScanImport.Status.DONE:
+            return Response(
+                {"detail": "Import already completed — cannot cancel."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Already failed → idempotent, just return current state
+        if scan_import.status == ScanImport.Status.FAILED:
+            return Response(ScanImportSerializer(scan_import).data)
+
+        # Mark as failed immediately so the task won't call mark_done
+        scan_import.mark_failed("Cancelled by user.")
+
+        # Revoke the Celery task if we have its ID (field may not exist on old records)
+        task_id = getattr(scan_import, "celery_task_id", "") or ""
+        if task_id:
+            try:
+                from config.celery import app as celery_app
+                celery_app.control.revoke(task_id, terminate=True, signal="SIGTERM")
+                logger.info("Revoked Celery task %s for ScanImport %s.", task_id, pk)
+            except Exception as exc:
+                logger.warning("Could not revoke Celery task: %s", exc)
+
+        return Response(ScanImportSerializer(scan_import).data)
+
+
+class ScanImportRetryView(APIView):
+    """
+    POST /api/v1/vulnerabilities/imports/<pk>/retry/
+    Re-queue a scan import that is stuck in 'processing' or has 'failed'.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request: Request, pk: int) -> Response:
+        scan_import = get_object_or_404(
+            ScanImport,
+            pk=pk,
+            subproject__project__organization=request.user.organization,
+        )
+
+        if scan_import.status == ScanImport.Status.DONE:
+            return Response(
+                {"detail": "Import already completed successfully."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Reset to pending so the UI shows the right state before the task runs
+        scan_import.status = ScanImport.Status.PENDING
+        scan_import.error_message = ""
+        scan_import.save(update_fields=["status", "error_message"])
+
+        from apps.parsers.tasks import parse_scan_file
+        parse_scan_file.delay(scan_import.pk)
+
+        logger.info("ScanImport %s re-queued by %s.", pk, request.user.email)
+        return Response(ScanImportSerializer(scan_import).data)
 
 
 class VulnerabilityDiffView(APIView):

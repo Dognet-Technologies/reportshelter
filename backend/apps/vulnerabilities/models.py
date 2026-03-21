@@ -7,7 +7,19 @@ diff/timeline logic, and ScanImport tracking.
 from __future__ import annotations
 
 from django.db import models
+from django.db.models import Case, IntegerField, Value, When
 from django.utils import timezone
+
+# Maps risk_level to a numeric weight for semantic ordering (critical first).
+RISK_LEVEL_ORDER = Case(
+    When(risk_level="critical", then=Value(0)),
+    When(risk_level="high", then=Value(1)),
+    When(risk_level="medium", then=Value(2)),
+    When(risk_level="low", then=Value(3)),
+    When(risk_level="info", then=Value(4)),
+    default=Value(5),
+    output_field=IntegerField(),
+)
 
 
 class ScanImport(models.Model):
@@ -53,6 +65,7 @@ class ScanImport(models.Model):
     )
     imported_at = models.DateTimeField(auto_now_add=True)
     processed_at = models.DateTimeField(null=True, blank=True)
+    celery_task_id = models.CharField(max_length=255, blank=True, null=True, default=None)
 
     class Meta:
         verbose_name = "Scan Import"
@@ -164,7 +177,11 @@ class Vulnerability(models.Model):
     class Meta:
         verbose_name = "Vulnerability"
         verbose_name_plural = "Vulnerabilities"
-        ordering = ["-risk_score", "-cvss_score", "title"]
+        ordering = [
+            models.F("risk_score").desc(nulls_last=True),
+            models.F("cvss_score").desc(nulls_last=True),
+            "title",
+        ]
         indexes = [
             models.Index(fields=["subproject", "title", "affected_host", "affected_port"]),
             models.Index(fields=["vuln_status"]),

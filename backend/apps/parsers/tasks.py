@@ -40,7 +40,8 @@ def parse_scan_file(self, scan_import_id: int) -> dict:
         return {"error": "ScanImport not found."}
 
     scan_import.status = ScanImport.Status.PROCESSING
-    scan_import.save(update_fields=["status"])
+    scan_import.celery_task_id = self.request.id or None
+    scan_import.save(update_fields=["status", "celery_task_id"])
 
     try:
         parser = get_parser(scan_import.tool)
@@ -67,6 +68,12 @@ def parse_scan_file(self, scan_import_id: int) -> dict:
         subproject_id=scan_import.subproject_id,
         scan_import_id=scan_import_id,
     )
+
+    # Check if the import was cancelled while we were parsing
+    scan_import.refresh_from_db(fields=["status"])
+    if scan_import.status == ScanImport.Status.FAILED:
+        logger.info("ScanImport %s was cancelled during processing — skipping save.", scan_import_id)
+        return {"cancelled": True}
 
     scan_import.mark_done(len(saved))
 

@@ -2,27 +2,25 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>{{ project.title }} — Security Assessment Report</title>
+  <title>{{ project.title }} — {{ report_type_label }}</title>
   <style>
     /* ---------------------------------------------------------------
        WeasyPrint-compatible CSS — no flexbox/grid (limited support)
+       Style variables come from rpt_style (per-report overrides merged
+       with project-level defaults).
        --------------------------------------------------------------- */
     @page {
       size: A4;
       margin: 20mm 18mm 25mm 18mm;
-      @top-center {
-        content: element(header);
-      }
-      @bottom-center {
-        content: element(footer);
-      }
+      @top-center   { content: element(header); }
+      @bottom-center{ content: element(footer); }
     }
 
     /* Running header */
     #running-header {
       position: running(header);
       width: 100%;
-      border-bottom: 1px solid {{ project.primary_color }};
+      border-bottom: 1px solid {{ rpt_style.primary_color }};
       padding-bottom: 4px;
       font-size: 9pt;
       color: #555;
@@ -53,8 +51,8 @@
       {% endif %}
     }
 
-    /* Watermark — WeasyPrint-safe (no CSS transform) */
-    {% if project.watermark_text %}
+    /* Watermark */
+    {% if rpt_style.watermark %}
     #watermark {
       position: fixed;
       top: 35%;
@@ -63,54 +61,61 @@
       text-align: center;
       font-size: 60pt;
       font-weight: bold;
-      color: rgba(0,0,0,{{ project.watermark_opacity }});
+      color: rgba(0,0,0,{{ rpt_style.watermark_opacity }});
       z-index: -1;
       white-space: nowrap;
       pointer-events: none;
-      opacity: {{ project.watermark_opacity }};
+      opacity: {{ rpt_style.watermark_opacity }};
     }
     {% endif %}
 
     /* Base typography */
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: "{{ project.font_family }}", "Helvetica Neue", Arial, sans-serif;
+      font-family: "{{ rpt_style.font }}", "Helvetica Neue", Arial, sans-serif;
       font-size: 10pt;
       color: #1f2937;
       line-height: 1.5;
     }
-    h1 { font-size: 24pt; color: {{ project.primary_color }}; margin-bottom: 12px; }
-    h2 { font-size: 16pt; color: {{ project.primary_color }}; border-bottom: 2px solid {{ project.primary_color }}; padding-bottom: 4px; margin: 24px 0 12px; }
-    h3 { font-size: 12pt; color: {{ project.secondary_color }}; margin: 16px 0 8px; }
+    h1 { font-size: {{ rpt_style.title_h1 }}; color: {{ rpt_style.primary_color }};   margin-bottom: 12px; }
+    h2 { font-size: {{ rpt_style.title_h2 }}; color: {{ rpt_style.primary_color }};   border-bottom: 2px solid {{ rpt_style.primary_color }}; padding-bottom: 4px; margin: 24px 0 12px; }
+    h3 { font-size: {{ rpt_style.title_h3 }}; color: {{ rpt_style.secondary_color }}; margin: 16px 0 8px; }
     p  { margin-bottom: 8px; }
 
     /* Cover page */
-    .cover {
-      page: cover;
-      height: 260mm;
-      text-align: center;
-      padding-top: 80mm;
-    }
+    .cover { page: cover; height: 260mm; text-align: center; padding-top: 80mm; }
     @page cover { margin: 0; @top-center { content: none; } @bottom-center { content: none; } }
-    .cover-title { font-size: 28pt; color: {{ project.primary_color }}; font-weight: bold; }
-    .cover-subtitle { font-size: 14pt; color: {{ project.secondary_color }}; margin-top: 8px; }
-    .cover-meta { margin-top: 40px; font-size: 10pt; color: #555; }
-    .cover-line { width: 80px; height: 4px; background: {{ project.primary_color }}; margin: 20px auto; }
+    .cover-title    { font-size: 28pt; color: {{ rpt_style.primary_color }};   font-weight: bold; }
+    .cover-subtitle { font-size: 14pt; color: {{ rpt_style.secondary_color }}; margin-top: 8px; }
+    .cover-meta     { margin-top: 40px; font-size: 10pt; color: #555; }
+    .cover-line     { width: 80px; height: 4px; background: {{ rpt_style.primary_color }}; margin: 20px auto; }
+    .classification-badge {
+      display: inline-block;
+      border: 1px solid {{ rpt_style.primary_color }};
+      color: {{ rpt_style.primary_color }};
+      font-size: 8pt;
+      font-weight: bold;
+      letter-spacing: 1px;
+      padding: 2px 10px;
+      border-radius: {{ rpt_style.border_radius_px }};
+      margin-bottom: 16px;
+    }
 
     /* Section page break */
     .page-break { page-break-before: always; }
 
     /* Executive summary KPI boxes */
-    .kpi-row { width: 100%; margin-bottom: 16px; }
-    .kpi-box {
+    .kpi-row  { width: 100%; margin-bottom: 16px; }
+    .kpi-box  {
       display: inline-block;
       width: 18%;
       margin-right: 2%;
       border: 1px solid #e5e7eb;
-      border-top: 4px solid {{ project.primary_color }};
+      border-top: 4px solid {{ rpt_style.primary_color }};
       padding: 10px;
       text-align: center;
       vertical-align: top;
+      border-radius: {{ rpt_style.border_radius_px }};
     }
     .kpi-box.critical { border-top-color: #dc2626; }
     .kpi-box.high     { border-top-color: #ea580c; }
@@ -118,19 +123,19 @@
     .kpi-box.low      { border-top-color: #2563eb; }
     .kpi-box.info     { border-top-color: #6b7280; }
     .kpi-number { font-size: 22pt; font-weight: bold; }
-    .kpi-label  { font-size: 8pt; color: #6b7280; text-transform: uppercase; }
+    .kpi-label  { font-size: 8pt;  color: #6b7280;   text-transform: uppercase; }
 
     /* Chart containers */
     .chart-grid { width: 100%; margin-bottom: 20px; }
     .chart-half { display: inline-block; width: 48%; vertical-align: top; }
     .chart-half + .chart-half { margin-left: 3%; }
     .chart-full { width: 100%; }
-    .chart-img { width: 100%; }
+    .chart-img  { width: 100%; }
 
     /* Vulnerability table */
     table.vuln-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 9pt; }
     table.vuln-table th {
-      background: {{ project.primary_color }};
+      background: {{ rpt_style.primary_color }};
       color: #fff;
       padding: 6px 8px;
       text-align: left;
@@ -142,39 +147,78 @@
     .badge {
       display: inline-block;
       padding: 2px 8px;
-      border-radius: 4px;
+      border-radius: {{ rpt_style.border_radius_px }};
       font-size: 8pt;
       font-weight: bold;
       color: #fff;
     }
-    .badge-critical { background: #dc2626; }
-    .badge-high     { background: #ea580c; }
-    .badge-medium   { background: #d97706; }
-    .badge-low      { background: #2563eb; }
-    .badge-info     { background: #6b7280; }
-
-    /* Recurring badge */
+    .badge-critical  { background: #dc2626; }
+    .badge-high      { background: #ea580c; }
+    .badge-medium    { background: #d97706; }
+    .badge-low       { background: #2563eb; }
+    .badge-info      { background: #6b7280; }
     .badge-recurring { background: #7c3aed; }
 
     /* Vulnerability detail card */
-    .vuln-card { border: 1px solid #e5e7eb; border-radius: 6px; margin-bottom: 24px; overflow: hidden; page-break-inside: avoid; }
+    .vuln-card        { border: 1px solid #e5e7eb; border-radius: {{ rpt_style.border_radius_px }}; margin-bottom: 24px; overflow: hidden; page-break-inside: avoid; }
     .vuln-card-header { background: #f3f4f6; padding: 10px 14px; border-bottom: 1px solid #e5e7eb; }
-    .vuln-card-body { padding: 12px 14px; }
-    .vuln-meta { font-size: 8.5pt; color: #6b7280; margin-bottom: 8px; }
-    .vuln-meta span { margin-right: 14px; }
+    .vuln-card-body   { padding: 12px 14px; }
+    .vuln-meta        { font-size: 8.5pt; color: #6b7280; margin-bottom: 8px; }
+    .vuln-meta span   { margin-right: 14px; }
 
-    /* Code block */
-    pre, code {
+    /* Evidence styles */
+    .evidence-code {
       font-family: "Courier New", Courier, monospace;
       font-size: 8pt;
       background: #1f2937;
       color: #f9fafb;
       padding: 10px;
-      border-radius: 4px;
+      border-radius: {{ rpt_style.border_radius_px }};
       white-space: pre-wrap;
       word-break: break-all;
       margin: 8px 0;
     }
+    .evidence-box {
+      font-family: "Courier New", Courier, monospace;
+      font-size: 8pt;
+      border: 1px solid #e5e7eb;
+      background: #f9fafb;
+      padding: 10px;
+      border-radius: {{ rpt_style.border_radius_px }};
+      white-space: pre-wrap;
+      word-break: break-all;
+      margin: 8px 0;
+    }
+    .evidence-shaded {
+      font-family: "Courier New", Courier, monospace;
+      font-size: 8pt;
+      background: #e5e7eb;
+      padding: 10px;
+      border-radius: {{ rpt_style.border_radius_px }};
+      white-space: pre-wrap;
+      word-break: break-all;
+      margin: 8px 0;
+    }
+    .evidence-marker {
+      font-family: "Courier New", Courier, monospace;
+      font-size: 8pt;
+      border-left: 4px solid {{ rpt_style.primary_color }};
+      background: #f0f9ff;
+      padding: 10px;
+      white-space: pre-wrap;
+      word-break: break-all;
+      margin: 8px 0;
+    }
+
+    /* Host breakdown */
+    .host-section { margin-bottom: 20px; }
+    .host-title   { font-size: 11pt; font-weight: bold; color: {{ rpt_style.secondary_color }}; margin-bottom: 6px; }
+
+    /* Remediation table */
+    table.rem-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 9pt; }
+    table.rem-table th { background: {{ rpt_style.secondary_color }}; color: #fff; padding: 6px 8px; text-align: left; }
+    table.rem-table td { padding: 5px 8px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+    table.rem-table tr:nth-child(even) td { background: #f9fafb; }
 
     /* Last page */
     .last-page { page: lastpage; text-align: center; padding-top: 80mm; }
@@ -183,9 +227,8 @@
 </head>
 <body>
 
-  <!-- Watermark -->
-  {% if project.watermark_text %}
-  <div id="watermark">{{ project.watermark_text }}</div>
+  {% if rpt_style.watermark %}
+  <div id="watermark">{{ rpt_style.watermark }}</div>
   {% endif %}
 
   <!-- Running header -->
@@ -197,6 +240,7 @@
       {% if project.header_text_center %}
         &nbsp;{{ project.header_text_center }}
       {% endif %}
+      &nbsp;<span style="color:#aaa;font-size:8pt;">{{ rpt_extra.classification }}</span>
     </span>
     <span class="header-right">
       {% if project.header_show_date %}{{ now()|format_date }}{% endif %}
@@ -209,49 +253,49 @@
     <span class="footer-right"><span class="page-number"></span></span>
   </div>
 
-  <!-- ======== COVER PAGE ======== -->
-  <div class="cover">
-    {% if project.client_logo %}
-      <img src="{{ project.client_logo.path }}" style="max-height:80px; margin-bottom:20px;" /><br/>
-    {% endif %}
-    <div class="cover-title">{{ project.title }}</div>
-    <div class="cover-subtitle">Security Assessment Report</div>
-    <div class="cover-line"></div>
-    <div class="cover-meta">
-      <strong>Client:</strong> {{ project.client_name or "—" }}<br/>
-      {% if project.client_contact %}<strong>Contact:</strong> {{ project.client_contact }}<br/>{% endif %}
-      <strong>Date:</strong> {{ subproject.scan_date|format_date if subproject.scan_date else now()|format_date }}<br/>
-      <strong>Prepared by:</strong> {{ org.name }}
-    </div>
-    {% if org.logo %}
-      <div style="margin-top:40px;">
-        <img src="{{ org.logo.path }}" style="max-height:50px;" />
-      </div>
-    {% endif %}
-  </div>
+  {# ================================================================
+     SECTION MACROS
+     Each macro is responsible for one content section.
+     They are called in the order defined by ordered_sections so the
+     user's drag-and-drop ordering is fully respected in the PDF.
+     ================================================================ #}
 
-  <!-- ======== TABLE OF CONTENTS ======== -->
+  {# ── Table of Contents ── #}
+  {% macro mac_toc() %}
   <div class="page-break">
     <h2>Table of Contents</h2>
     <ol style="margin-left:20px; line-height:2;">
-      <li>Executive Summary</li>
-      <li>Vulnerability Overview</li>
-      <li>Detailed Findings</li>
-      <li>Appendices</li>
+      {% for sid in ordered_sections %}
+        {% if   sid == 'executive_summary' or sid == 'risk_summary' %}<li>Executive Summary</li>
+        {% elif sid == 'scope'             %}<li>Scope &amp; Methodology</li>
+        {% elif sid == 'vuln_details'      %}<li>Vulnerability Overview &amp; Detailed Findings</li>
+        {% elif sid == 'host_breakdown'    %}<li>Host Breakdown</li>
+        {% elif sid == 'remediation_plan'  %}<li>Remediation Plan</li>
+        {% elif sid == 'attack_timeline'   %}<li>Attack Timeline</li>
+        {% elif sid == 'ioc'               %}<li>Indicators of Compromise</li>
+        {% elif sid == 'diff_retest'       %}<li>Retest Comparison</li>
+        {% elif sid == 'risk_register'     %}<li>Risk Register</li>
+        {% elif sid == 'compliance_matrix' %}<li>Compliance Matrix</li>
+        {% elif sid == 'osint_findings'    %}<li>OSINT Findings</li>
+        {% elif sid == 'recommendations'   %}<li>Recommendations</li>
+        {% elif sid == 'appendix'          %}<li>Appendices</li>
+        {% endif %}
+      {% endfor %}
     </ol>
   </div>
+  {% endmacro %}
 
-  <!-- ======== EXECUTIVE SUMMARY ======== -->
+  {# ── Executive Summary ── #}
+  {% macro mac_executive_summary() %}
   <div class="page-break">
-    <h2>1. Executive Summary</h2>
+    <h2>Executive Summary</h2>
     <p>
-      This report presents the findings of the security assessment conducted on
+      This report presents the findings of the
+      <strong>{{ report_type_label }}</strong> conducted on
       <strong>{{ project.client_name or "the target organization" }}</strong>.
-      The assessment covered {{ subproject.title }} and identified
-      <strong>{{ vulnerabilities|length }}</strong> vulnerabilities.
+      The assessment covered <em>{{ subproject.title }}</em> and identified
+      <strong>{{ vulnerabilities|length }}</strong> vulnerabilit{{ "y" if vulnerabilities|length == 1 else "ies" }}.
     </p>
-
-    <!-- KPI boxes -->
     <div class="kpi-row">
       <div class="kpi-box">
         <div class="kpi-number">{{ vulnerabilities|length }}</div>
@@ -264,8 +308,7 @@
       </div>
       {% endfor %}
     </div>
-
-    <!-- Charts -->
+    {% if 'risk_summary' in sections %}
     <div class="chart-grid">
       {% if charts.pie %}
       <div class="chart-half">
@@ -278,27 +321,98 @@
       </div>
       {% endif %}
     </div>
+    {% if charts.risk_matrix %}
+    <div class="chart-full">
+      <img class="chart-img" src="data:image/png;base64,{{ charts.risk_matrix }}" />
+    </div>
+    {% endif %}
+    {% endif %}
+  </div>
+  {% endmacro %}
 
+  {# ── Risk Summary (standalone — only when executive_summary is not present) ── #}
+  {% macro mac_risk_summary() %}
+  {% if 'executive_summary' not in sections %}
+  <div class="page-break">
+    <h2>Risk Summary</h2>
+    <div class="kpi-row">
+      <div class="kpi-box">
+        <div class="kpi-number">{{ vulnerabilities|length }}</div>
+        <div class="kpi-label">Total</div>
+      </div>
+      {% for level in ["critical", "high", "medium", "low", "info"] %}
+      <div class="kpi-box {{ level }}">
+        <div class="kpi-number">{{ severity_counts.get(level, 0) }}</div>
+        <div class="kpi-label">{{ level|capitalize }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="chart-grid">
+      {% if charts.pie %}
+      <div class="chart-half">
+        <img class="chart-img" src="data:image/png;base64,{{ charts.pie }}" />
+      </div>
+      {% endif %}
+      {% if charts.bar %}
+      <div class="chart-half">
+        <img class="chart-img" src="data:image/png;base64,{{ charts.bar }}" />
+      </div>
+      {% endif %}
+    </div>
     {% if charts.risk_matrix %}
     <div class="chart-full">
       <img class="chart-img" src="data:image/png;base64,{{ charts.risk_matrix }}" />
     </div>
     {% endif %}
   </div>
+  {% endif %}
+  {% endmacro %}
 
-  <!-- ======== VULNERABILITY OVERVIEW TABLE ======== -->
+  {# ── Scope & Methodology ── #}
+  {% macro mac_scope() %}
   <div class="page-break">
-    <h2>2. Vulnerability Overview</h2>
+    <h2>Scope &amp; Methodology</h2>
+    <h3>Scope</h3>
+    {% if rpt_extra.scope %}
+    <p>{{ rpt_extra.scope }}</p>
+    {% elif subproject.description %}
+    <p>{{ subproject.description }}</p>
+    {% else %}
+    <p>
+      The scope of this assessment encompassed the systems and services associated with
+      <strong>{{ project.client_name or "the client" }}</strong> as defined during the
+      pre-engagement phase.
+    </p>
+    {% endif %}
+    {% if rpt_extra.engagement_type %}
+    <p><strong>Engagement type:</strong> {{ rpt_extra.engagement_type|replace("_", " ")|capitalize }}</p>
+    {% endif %}
+    <h3>Methodology</h3>
+    {% if rpt_extra.methodologies %}
+    <p>
+      The assessment was conducted using industry-standard methodologies including:
+      <strong>{{ rpt_extra.methodologies|join(", ") }}</strong>.
+    </p>
+    {% else %}
+    <p>
+      The assessment was conducted using industry-standard tools and methodologies
+      aligned with the OWASP Testing Guide and PTES
+      (Penetration Testing Execution Standard).
+    </p>
+    {% endif %}
+  </div>
+  {% endmacro %}
+
+  {# ── Vulnerability Details (overview table + detailed cards) ── #}
+  {% macro mac_vuln_details() %}
+  <div class="page-break">
+    <h2>Vulnerability Overview</h2>
+    {% if vulnerabilities %}
     <table class="vuln-table">
       <thead>
         <tr>
-          <th>#</th>
-          <th>Title</th>
-          <th>Host</th>
-          <th>Port</th>
-          <th>Severity</th>
-          <th>CVSS</th>
-          <th>Status</th>
+          <th>#</th><th>Title</th><th>Host</th><th>Port</th>
+          <th>Severity</th><th>CVSS</th><th>Status</th>
         </tr>
       </thead>
       <tbody>
@@ -318,12 +432,12 @@
         {% endfor %}
       </tbody>
     </table>
+    {% else %}
+    <p>No vulnerabilities match the selected filters.</p>
+    {% endif %}
   </div>
-
-  <!-- ======== DETAILED FINDINGS ======== -->
   <div class="page-break">
-    <h2>3. Detailed Findings</h2>
-
+    <h2>Detailed Findings</h2>
     {% for v in vulnerabilities %}
     <div class="vuln-card">
       <div class="vuln-card-header">
@@ -335,36 +449,173 @@
       </div>
       <div class="vuln-card-body">
         <div class="vuln-meta">
-          {% if v.affected_host %}<span><strong>Host:</strong> {{ v.affected_host }}</span>{% endif %}
-          {% if v.affected_port %}<span><strong>Port:</strong> {{ v.affected_port }}</span>{% endif %}
+          {% if v.affected_host    %}<span><strong>Host:</strong> {{ v.affected_host }}</span>{% endif %}
+          {% if v.affected_port    %}<span><strong>Port:</strong> {{ v.affected_port }}</span>{% endif %}
           {% if v.affected_service %}<span><strong>Service:</strong> {{ v.affected_service }}</span>{% endif %}
-          {% if v.cvss_score is not none %}<span><strong>CVSS:</strong> <span style="color:{{ v.cvss_score|cvss_color }}">{{ "%.1f"|format(v.cvss_score) }}</span></span>{% endif %}
-          {% if v.epss_score is not none %}<span><strong>EPSS:</strong> {{ "%.2f%%"|format(v.epss_score * 100) }}</span>{% endif %}
+          {% if audience != 'executive' %}
+            {% if v.cvss_score is not none %}<span><strong>CVSS:</strong> <span style="color:{{ v.cvss_score|cvss_color }}">{{ "%.1f"|format(v.cvss_score) }}</span></span>{% endif %}
+            {% if v.epss_score is not none %}<span><strong>EPSS:</strong> {{ "%.2f%%"|format(v.epss_score * 100) }}</span>{% endif %}
+          {% endif %}
           {% if v.sources %}<span><strong>Detected by:</strong> {{ v.sources|join(", ") }}</span>{% endif %}
         </div>
-
         {% if v.description %}
         <h3>Description</h3>
         <p>{{ v.description }}</p>
         {% endif %}
-
         {% if v.remediation %}
         <h3>Remediation</h3>
         <p>{{ v.remediation }}</p>
         {% endif %}
-
-        {% if v.evidence_code %}
+        {% if audience == 'technical' and v.evidence_code %}
         <h3>Evidence</h3>
-        <pre>{{ v.evidence_code[:2000] }}</pre>
+        <div class="evidence-{{ rpt_style.evidence_style }}">{{ v.evidence_code[:2000] }}</div>
         {% endif %}
       </div>
     </div>
     {% endfor %}
   </div>
+  {% endmacro %}
 
-  <!-- ======== APPENDICES ======== -->
+  {# ── Host Breakdown ── #}
+  {% macro mac_host_breakdown() %}
+  {% if hosts %}
   <div class="page-break">
-    <h2>4. Appendices</h2>
+    <h2>Host Breakdown</h2>
+    {% for host_name, host_vulns in hosts.items() %}
+    <div class="host-section">
+      <div class="host-title">{{ host_name }} — {{ host_vulns|length }} finding{{ "s" if host_vulns|length != 1 else "" }}</div>
+      <table class="vuln-table">
+        <thead>
+          <tr><th>#</th><th>Title</th><th>Port</th><th>Severity</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          {% for v in host_vulns %}
+          <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ v.title }}</td>
+            <td>{{ v.affected_port or "—" }}</td>
+            <td><span class="badge badge-{{ v.risk_level }}">{{ v.risk_level|upper }}</span></td>
+            <td>{{ v.vuln_status|replace("_", " ")|capitalize }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% endmacro %}
+
+  {# ── Remediation Plan ── #}
+  {% macro mac_remediation_plan() %}
+  <div class="page-break">
+    <h2>Remediation Plan</h2>
+    <p>The following table summarizes recommended actions, ordered by priority.</p>
+    {% if vulnerabilities %}
+    <table class="rem-table">
+      <thead>
+        <tr>
+          <th>Priority</th><th>Vulnerability</th><th>Host</th>
+          <th>Severity</th><th>Recommended Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for v in vulnerabilities %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ v.title }}{% if v.cve_id %} <em>({{ v.cve_id }})</em>{% endif %}</td>
+          <td>{{ v.affected_host or "—" }}</td>
+          <td><span class="badge badge-{{ v.risk_level }}">{{ v.risk_level|upper }}</span></td>
+          <td>{{ v.remediation or "See detailed findings." }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p>No vulnerabilities match the selected filters.</p>
+    {% endif %}
+  </div>
+  {% endmacro %}
+
+  {# ── Attack Timeline (placeholder) ── #}
+  {% macro mac_attack_timeline() %}
+  <div class="page-break">
+    <h2>Attack Timeline</h2>
+    <p>Chronological narrative of attack steps and adversary activity during the engagement.</p>
+    <p style="color:#6b7280;font-style:italic;">No timeline data recorded for this sub-project.</p>
+  </div>
+  {% endmacro %}
+
+  {# ── Indicators of Compromise (placeholder) ── #}
+  {% macro mac_ioc() %}
+  <div class="page-break">
+    <h2>Indicators of Compromise</h2>
+    <p>IoCs, TTPs, threat indicators, and file hashes identified during the engagement.</p>
+    <p style="color:#6b7280;font-style:italic;">No IoC data recorded for this sub-project.</p>
+  </div>
+  {% endmacro %}
+
+  {# ── Retest Comparison (placeholder) ── #}
+  {% macro mac_diff_retest() %}
+  <div class="page-break">
+    <h2>Retest Comparison</h2>
+    <p>Comparison of current findings against the previous assessment.</p>
+    <p style="color:#6b7280;font-style:italic;">No previous sub-project available for comparison.</p>
+  </div>
+  {% endmacro %}
+
+  {# ── Risk Register (placeholder) ── #}
+  {% macro mac_risk_register() %}
+  <div class="page-break">
+    <h2>Risk Register</h2>
+    <p>Risk catalog with risk acceptance decisions.</p>
+    <p style="color:#6b7280;font-style:italic;">No risk register entries for this sub-project.</p>
+  </div>
+  {% endmacro %}
+
+  {# ── Compliance Matrix (placeholder) ── #}
+  {% macro mac_compliance_matrix() %}
+  <div class="page-break">
+    <h2>Compliance Matrix</h2>
+    <p>Control-by-control compliance status.</p>
+    <p style="color:#6b7280;font-style:italic;">No compliance matrix data for this sub-project.</p>
+  </div>
+  {% endmacro %}
+
+  {# ── OSINT Findings (placeholder) ── #}
+  {% macro mac_osint_findings() %}
+  <div class="page-break">
+    <h2>OSINT Findings</h2>
+    <p>Public exposure, leaked data, and digital footprint analysis.</p>
+    <p style="color:#6b7280;font-style:italic;">No OSINT data recorded for this sub-project.</p>
+  </div>
+  {% endmacro %}
+
+  {# ── Recommendations ── #}
+  {% macro mac_recommendations() %}
+  <div class="page-break">
+    <h2>Recommendations</h2>
+    <p>
+      Based on the findings of this assessment, the following strategic recommendations
+      are provided to improve the overall security posture of
+      <strong>{{ project.client_name or "the organization" }}</strong>.
+    </p>
+    <ol style="margin-left:20px; line-height:2;">
+      {% if severity_counts.get('critical', 0) > 0 or severity_counts.get('high', 0) > 0 %}
+      <li>Prioritize remediation of Critical and High severity vulnerabilities immediately.</li>
+      {% endif %}
+      <li>Establish a patch management process to keep systems up to date.</li>
+      <li>Implement continuous security monitoring and periodic assessments.</li>
+      <li>Conduct security awareness training for staff.</li>
+      <li>Review and enforce the principle of least privilege across all systems.</li>
+    </ol>
+  </div>
+  {% endmacro %}
+
+  {# ── Appendix ── #}
+  {% macro mac_appendix() %}
+  <div class="page-break">
+    <h2>Appendices</h2>
 
     {% if charts.timeline %}
     <h3>Vulnerability Timeline</h3>
@@ -372,25 +623,89 @@
     {% endif %}
 
     <h3>Methodology</h3>
+    {% if rpt_extra.methodologies %}
+    <p>
+      This assessment used the following methodologies:
+      <strong>{{ rpt_extra.methodologies|join(", ") }}</strong>.
+    </p>
+    {% else %}
     <p>
       The assessment was conducted using industry-standard tools and methodologies
       aligned with OWASP Testing Guide and PTES (Penetration Testing Execution Standard).
     </p>
+    {% endif %}
+
+    {% if rpt_extra.references %}
+    <h3>References</h3>
+    <p>{{ rpt_extra.references }}</p>
+    {% endif %}
 
     {% if org.legal_disclaimer %}
     <h3>Legal Disclaimer</h3>
     <p>{{ org.legal_disclaimer }}</p>
     {% endif %}
   </div>
+  {% endmacro %}
 
-  <!-- ======== LAST PAGE ======== -->
+  {# ================================================================
+     COVER PAGE (always rendered, always first)
+     ================================================================ #}
+  <div class="cover">
+    <div class="classification-badge">{{ rpt_extra.classification }}</div><br/>
+    {% if project.client_logo %}
+      <img src="{{ project.client_logo.path }}" style="max-height:80px; margin-bottom:20px;" /><br/>
+    {% endif %}
+    <div class="cover-title">{{ project.title }}</div>
+    <div class="cover-subtitle">{{ report_type_label }}</div>
+    <div class="cover-line"></div>
+    <div class="cover-meta">
+      <strong>Client:</strong> {{ project.client_name or "—" }}<br/>
+      {% if project.client_contact %}<strong>Contact:</strong> {{ project.client_contact }}<br/>{% endif %}
+      <strong>Date:</strong> {{ subproject.scan_date|format_date if subproject.scan_date else now()|format_date }}<br/>
+      <strong>Version:</strong> {{ rpt_extra.version }}<br/>
+      {% if rpt_extra.authors %}<strong>Authors:</strong> {{ rpt_extra.authors }}<br/>{% endif %}
+      <strong>Prepared by:</strong> {{ org.name }}
+    </div>
+    {% if org.logo %}
+      <div style="margin-top:40px;">
+        <img src="{{ org.logo.path }}" style="max-height:50px;" />
+      </div>
+    {% endif %}
+  </div>
+
+  {# ================================================================
+     CONTENT SECTIONS — rendered in user-defined order
+     ================================================================ #}
+  {% for sec_id in ordered_sections %}
+    {% if   sec_id == 'toc'               %}{{ mac_toc() }}
+    {% elif sec_id == 'executive_summary' %}{{ mac_executive_summary() }}
+    {% elif sec_id == 'risk_summary'      %}{{ mac_risk_summary() }}
+    {% elif sec_id == 'scope'             %}{{ mac_scope() }}
+    {% elif sec_id == 'vuln_details'      %}{{ mac_vuln_details() }}
+    {% elif sec_id == 'host_breakdown'    %}{{ mac_host_breakdown() }}
+    {% elif sec_id == 'remediation_plan'  %}{{ mac_remediation_plan() }}
+    {% elif sec_id == 'attack_timeline'   %}{{ mac_attack_timeline() }}
+    {% elif sec_id == 'ioc'               %}{{ mac_ioc() }}
+    {% elif sec_id == 'diff_retest'       %}{{ mac_diff_retest() }}
+    {% elif sec_id == 'risk_register'     %}{{ mac_risk_register() }}
+    {% elif sec_id == 'compliance_matrix' %}{{ mac_compliance_matrix() }}
+    {% elif sec_id == 'osint_findings'    %}{{ mac_osint_findings() }}
+    {% elif sec_id == 'recommendations'   %}{{ mac_recommendations() }}
+    {% elif sec_id == 'appendix'          %}{{ mac_appendix() }}
+    {% endif %}
+  {% endfor %}
+
+  {# ================================================================
+     LAST PAGE (always rendered, always last)
+     ================================================================ #}
   <div class="last-page">
-    <div style="font-size:16pt; color:{{ project.primary_color }}; font-weight:bold;">
+    <div style="font-size:16pt; color:{{ rpt_style.primary_color }}; font-weight:bold;">
       {{ org.name }}
     </div>
     {% if org.address %}<div style="color:#6b7280;margin-top:8px;">{{ org.address }}</div>{% endif %}
-    {% if org.email %}<div style="color:#6b7280;">{{ org.email }}</div>{% endif %}
+    {% if org.email   %}<div style="color:#6b7280;">{{ org.email }}</div>{% endif %}
     {% if org.website %}<div style="color:#6b7280;">{{ org.website }}</div>{% endif %}
+    <div style="margin-top:16px; font-size:8pt; color:#aaa;">{{ rpt_extra.classification }} · v{{ rpt_extra.version }}</div>
   </div>
 
 </body>

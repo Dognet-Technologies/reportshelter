@@ -14,13 +14,14 @@ import { useDropzone } from "react-dropzone";
 import {
   Upload, Loader2, FileText, Download, Image, AlertCircle, CheckCircle2,
   Clock, RefreshCw, Plus, ChevronRight, ChevronLeft, BarChart2, Palette, Info,
-  Database, ChevronDown, ChevronUp,
+  Database, ChevronDown, ChevronUp, X,
 } from "lucide-react";
 import { format } from "date-fns";
 import toast from "react-hot-toast";
 import {
   useSubProject, useVulnerabilities, useUploadScan, useScanImports,
   useReportExports, useScreenshots, useUploadScreenshot, useLicenseStatus,
+  useRetryScanImport, useCancelScanImport,
 } from "@/api/hooks";
 import { downloadReport } from "@/api/download";
 import { useQueryClient } from "@tanstack/react-query";
@@ -427,6 +428,8 @@ interface ScansPanelProps {
 
 function ScansPanel({ subprojectId, selectedScanIds, onSelectionChange, canImport }: ScansPanelProps) {
   const { data: imports, isLoading } = useScanImports(subprojectId);
+  const retry = useRetryScanImport(subprojectId);
+  const cancel = useCancelScanImport(subprojectId);
   const [scannerType, setScannerType] = useState("nmap");
   const upload = useUploadScan(subprojectId);
   const qc = useQueryClient();
@@ -494,26 +497,55 @@ function ScansPanel({ subprojectId, selectedScanIds, onSelectionChange, canImpor
         ) : (
           <div className="space-y-1">
             {imports.map((imp) => (
-              <div key={imp.id} className={`flex items-center gap-3 rounded-lg border px-3 py-2 text-xs transition-colors ${
+              <div key={imp.id} className={`rounded-lg border px-3 py-2 text-xs transition-colors ${
                 imp.status === "done" && selectedScanIds.has(imp.id)
                   ? "border-blue-600/50 bg-blue-950/20"
+                  : imp.status === "failed"
+                  ? "border-red-900/50"
                   : "border-slate-800"
               }`}>
-                <input
-                  type="checkbox"
-                  checked={imp.status === "done" && selectedScanIds.has(imp.id)}
-                  onChange={() => imp.status === "done" && toggleOne(imp.id)}
-                  disabled={imp.status !== "done"}
-                  className="rounded border-slate-600 bg-slate-800 text-blue-500"
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="text-slate-200 font-medium truncate">{imp.original_filename}</p>
-                  <p className="text-slate-500">{imp.tool.toUpperCase()} · {format(new Date(imp.imported_at), "MMM d, HH:mm")}</p>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    checked={imp.status === "done" && selectedScanIds.has(imp.id)}
+                    onChange={() => imp.status === "done" && toggleOne(imp.id)}
+                    disabled={imp.status !== "done"}
+                    className="rounded border-slate-600 bg-slate-800 text-blue-500"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-slate-200 font-medium truncate">{imp.original_filename}</p>
+                    <p className="text-slate-500">{imp.tool.toUpperCase()} · {format(new Date(imp.imported_at), "MMM d, HH:mm")}</p>
+                  </div>
+                  <div className="text-right shrink-0 flex items-center gap-2">
+                    {imp.status === "done" && <p className="text-slate-400">{imp.vulnerability_count} findings</p>}
+                    <ImportStatusBadge status={imp.status} />
+                    {(imp.status === "failed" || imp.status === "processing") && (
+                      <button
+                        onClick={() => retry.mutate(imp.id, { onSuccess: () => toast.success("Re-queued."), onError: () => toast.error("Retry failed.") })}
+                        disabled={retry.isPending || cancel.isPending}
+                        className="ml-1 text-slate-400 hover:text-blue-400 transition-colors"
+                        title="Retry import"
+                      >
+                        <RefreshCw className="h-3 w-3" />
+                      </button>
+                    )}
+                    {(imp.status === "pending" || imp.status === "processing") && (
+                      <button
+                        onClick={() => cancel.mutate(imp.id, { onSuccess: () => toast.success("Import cancelled."), onError: () => toast.error("Cancel failed.") })}
+                        disabled={cancel.isPending || retry.isPending}
+                        className="ml-1 text-slate-400 hover:text-red-400 transition-colors"
+                        title="Cancel import"
+                      >
+                        {cancel.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <X className="h-3 w-3" />}
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div className="text-right shrink-0">
-                  {imp.status === "done" && <p className="text-slate-400">{imp.vulnerability_count} findings</p>}
-                  <ImportStatusBadge status={imp.status} />
-                </div>
+                {imp.status === "failed" && imp.error_message && (
+                  <p className="mt-1.5 ml-7 text-red-400 text-xs leading-snug line-clamp-2" title={imp.error_message}>
+                    {imp.error_message}
+                  </p>
+                )}
               </div>
             ))}
           </div>
@@ -669,7 +701,11 @@ export default function SubProjectPage() {
           <p className="text-slate-400 text-sm mt-1">{subproject.scan_date ? format(new Date(subproject.scan_date), "MMMM d, yyyy") : "—"}</p>
           {subproject.description && <p className="text-slate-500 text-sm mt-1">{subproject.description}</p>}
         </div>
-        <Link to={`/projects/${pId}/reports/builder/${spId}`} className="btn-primary shrink-0">
+        <Link
+          to={`/projects/${pId}/reports/builder/${spId}`}
+          state={{ reportType, audience, style, extra, enabledCharts, chartVariants }}
+          className="btn-primary shrink-0"
+        >
           <FileText className="h-4 w-4" />Generate Report
         </Link>
       </div>
@@ -745,7 +781,7 @@ export default function SubProjectPage() {
           <div className="card">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold text-slate-100 flex items-center gap-2 text-sm"><FileText className="h-4 w-4" />Exports</h3>
-              <Link to={`/projects/${pId}/reports/builder/${spId}`} className="btn-primary text-xs py-1.5"><Plus className="h-3.5 w-3.5" />Generate</Link>
+              <Link to={`/projects/${pId}/reports/builder/${spId}`} state={{ reportType, audience, style, extra, enabledCharts, chartVariants }} className="btn-primary text-xs py-1.5"><Plus className="h-3.5 w-3.5" />Generate</Link>
             </div>
             {!exports?.length ? (
               <p className="text-slate-500 text-sm text-center py-3">No reports yet.</p>

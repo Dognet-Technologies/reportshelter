@@ -55,11 +55,28 @@ class ReportGenerateView(APIView):
             project__organization=request.user.organization,
         )
 
-        options = {}
-        if data.get("vuln_status"):
-            options["vuln_status"] = data["vuln_status"]
+        # Merge statuses from both field names; frontend sends "statuses".
+        vuln_status = data.get("statuses") or data.get("vuln_status") or []
+
+        options: dict = {}
+        if vuln_status:
+            options["vuln_status"] = vuln_status
         if data.get("risk_levels"):
             options["risk_levels"] = data["risk_levels"]
+        if data.get("report_type"):
+            options["report_type"] = data["report_type"]
+        if data.get("sections"):
+            options["sections"] = data["sections"]
+        if data.get("audience"):
+            options["audience"] = data["audience"]
+        if data.get("style"):
+            options["style"] = data["style"]
+        if data.get("extra"):
+            options["extra"] = data["extra"]
+        if data.get("charts_enabled"):
+            options["charts_enabled"] = data["charts_enabled"]
+        if data.get("charts_variants"):
+            options["charts_variants"] = data["charts_variants"]
 
         export = ReportExport.objects.create(
             subproject=subproject,

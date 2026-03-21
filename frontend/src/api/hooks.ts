@@ -445,6 +445,28 @@ export function useUploadScan(subprojectId: number) {
   });
 }
 
+export function useRetryScanImport(subprojectId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (importId: number) =>
+      apiClient.post<ScanImport>(`/vulnerabilities/imports/${importId}/retry/`).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["scanImports", subprojectId] });
+    },
+  });
+}
+
+export function useCancelScanImport(subprojectId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (importId: number) =>
+      apiClient.post<ScanImport>(`/vulnerabilities/imports/${importId}/cancel/`).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["scanImports", subprojectId] });
+    },
+  });
+}
+
 // ─── Report Export hooks ─────────────────────────────────────────────────────
 
 export function useReportExports(
@@ -487,7 +509,22 @@ export function useGenerateReport() {
       subproject: number;
       format: ReportFormat;
       risk_levels?: RiskLevel[];
-      vuln_status?: VulnStatus[];
+      /** Vulnerability status filter (sent as "statuses" to match frontend field name). */
+      statuses?: VulnStatus[];
+      /** Report type ID (e.g. "pentest", "va", "executive"). */
+      report_type?: string;
+      /** Ordered list of section IDs to include. */
+      sections?: string[];
+      /** Target audience: "executive" | "management" | "technical". */
+      audience?: string;
+      /** Per-report visual style (colors, font, watermark, etc.). */
+      style?: Record<string, string>;
+      /** Extra metadata (classification, scope, authors, methodologies, etc.). */
+      extra?: Record<string, unknown>;
+      /** Which charts to include, keyed by chart ID. */
+      charts_enabled?: Record<string, boolean>;
+      /** Chart variant selections (e.g. "Donut" vs "Pie"). */
+      charts_variants?: Record<string, string>;
     }) =>
       apiClient.post<ReportExport>("/reports/generate/", data).then((r) => r.data),
     onSuccess: (report) => {
@@ -525,6 +562,27 @@ export function useUploadScreenshot(projectId: number, subprojectId: number) {
           { headers: { "Content-Type": "multipart/form-data" } }
         )
         .then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.screenshots(subprojectId) });
+    },
+  });
+}
+
+export function useUpdateScreenshot(subprojectId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Partial<Pick<Screenshot, "caption" | "order" | "vulnerability_ref">> }) =>
+      apiClient.patch<Screenshot>(`/screenshots/${id}/`, data).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.screenshots(subprojectId) });
+    },
+  });
+}
+
+export function useDeleteScreenshot(subprojectId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => apiClient.delete(`/screenshots/${id}/`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.screenshots(subprojectId) });
     },
