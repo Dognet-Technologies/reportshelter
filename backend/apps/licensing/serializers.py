@@ -42,9 +42,4 @@ class ActivateLicenseSerializer(serializers.Serializer):
     license_key = serializers.CharField(max_length=255, min_length=10)
 
     def validate_license_key(self, value: str) -> str:
-        """Ensure the key matches the RS-XXXX-XXXX-XXXX-XXXX format."""
-        if not _LICENSE_KEY_RE.match(value):
-            raise serializers.ValidationError(
-                "Invalid license key format. Expected: RS-XXXX-XXXX-XXXX-XXXX"
-            )
         return value.upper()

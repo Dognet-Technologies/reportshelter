@@ -6,6 +6,7 @@ diff/timeline logic, and ScanImport tracking.
 
 from __future__ import annotations
 
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models import Case, IntegerField, Value, When
 from django.utils import timezone
@@ -109,6 +110,18 @@ class Vulnerability(models.Model):
         ACCEPTED = "accepted", "Risk Accepted"
         RETEST = "retest", "Needs Retest"
 
+    class EnrichmentStatus(models.TextChoices):
+        PENDING = "pending", "Pending"
+        DONE = "done", "Done"
+        FAILED = "failed", "Failed"
+        SKIPPED = "skipped", "Skipped"
+        PARTIAL = "partial", "Partial"
+
+    class EffortLevel(models.TextChoices):
+        LOW = "low", "Low"
+        MEDIUM = "medium", "Medium"
+        HIGH = "high", "High"
+
     subproject = models.ForeignKey(
         "projects.SubProject",
         on_delete=models.CASCADE,
@@ -128,12 +141,47 @@ class Vulnerability(models.Model):
     remediation = models.TextField(blank=True)
 
     # Target info
+    affected_ip = models.CharField(max_length=45, blank=True, help_text="Raw IP address (IPv4/IPv6)")
     affected_host = models.CharField(max_length=255, blank=True)
-    affected_port = models.CharField(max_length=16, blank=True)
+    affected_port = models.IntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1), MaxValueValidator(65535)],
+    )
     affected_service = models.CharField(max_length=128, blank=True)
 
-    # CVE / CVSS
-    cve_id = models.CharField(max_length=32, blank=True, db_index=True)
+    # Category — CWE / OWASP Top 10 / MASVS / custom (for vulns_by_category chart)
+    category = models.CharField(
+        max_length=128,
+        blank=True,
+        help_text="Vulnerability category: CWE-ID, OWASP Top 10 label, MASVS control, etc.",
+    )
+
+    # Manual risk matrix axes (1-5 each; used to plot the 5×5 risk_matrix chart)
+    # If not set by a parser, the generator derives them from CVSS/EPSS.
+    likelihood = models.IntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1), MaxValueValidator(5)],
+        help_text="Likelihood of exploitation (1=Very Low … 5=Very High).",
+    )
+    impact = models.IntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1), MaxValueValidator(5)],
+        help_text="Business impact if exploited (1=Negligible … 5=Critical).",
+    )
+
+    # Estimated remediation effort — set manually or inferred from severity
+    effort_level = models.CharField(
+        max_length=8,
+        choices=EffortLevel.choices,
+        blank=True,
+        help_text="Estimated effort to remediate: low / medium / high.",
+    )
+
+    # CVE list / CVSS
+    cve_id = models.JSONField(default=list, help_text="List of CVE identifiers, e.g. ['CVE-2022-1234']")
     cvss_score = models.FloatField(null=True, blank=True)
     cvss_vector = models.CharField(max_length=255, blank=True)
 
@@ -150,6 +198,13 @@ class Vulnerability(models.Model):
 
     # Status
     vuln_status = models.CharField(max_length=16, choices=VulnStatus.choices, default=VulnStatus.OPEN)
+
+    # NVD enrichment tracking
+    nvd_enrichment_status = models.CharField(
+        max_length=16,
+        choices=EnrichmentStatus.choices,
+        default=EnrichmentStatus.PENDING,
+    )
 
     # Deduplication
     sources = models.JSONField(
@@ -183,7 +238,7 @@ class Vulnerability(models.Model):
             "title",
         ]
         indexes = [
-            models.Index(fields=["subproject", "title", "affected_host", "affected_port"]),
+            models.Index(fields=["subproject", "title", "affected_ip", "affected_host", "affected_port"]),
             models.Index(fields=["vuln_status"]),
             models.Index(fields=["risk_level"]),
         ]
@@ -192,13 +247,70 @@ class Vulnerability(models.Model):
         return f"[{self.risk_level.upper()}] {self.title} @ {self.affected_host}"
 
     @property
+    def primary_cve_id(self) -> str:
+        """Return the first CVE ID in the list, or empty string."""
+        return self.cve_id[0] if self.cve_id else ""
+
+    @property
     def dedup_key(self) -> tuple[str, str, str]:
         """Uniqueness key for deduplication within a subproject."""
-        return (
-            self.title.lower().strip(),
-            self.affected_host.lower().strip(),
-            self.affected_port.strip(),
-        )
+        host = (self.affected_ip or self.affected_host).lower().strip()
+        port = str(self.affected_port) if self.affected_port else ""
+        return (self.title.lower().strip(), host, port)
+
+    def effective_likelihood(self) -> int:
+        """
+        Return the stored likelihood (1-5), or derive it from EPSS when absent.
+        EPSS → likelihood mapping: [0,0.1) → 1, [0.1,0.3) → 2, [0.3,0.6) → 3,
+        [0.6,0.85) → 4, [0.85,1] → 5.
+        Falls back to risk_level-derived value when EPSS is also unavailable.
+        """
+        if self.likelihood is not None:
+            return self.likelihood
+        epss = self.epss_score
+        if epss is not None:
+            if epss < 0.10:
+                return 1
+            if epss < 0.30:
+                return 2
+            if epss < 0.60:
+                return 3
+            if epss < 0.85:
+                return 4
+            return 5
+        # Fallback: derive from risk_level
+        return {"critical": 4, "high": 3, "medium": 2, "low": 1, "info": 1}.get(self.risk_level, 2)
+
+    def effective_impact(self) -> int:
+        """
+        Return the stored impact (1-5), or derive it from CVSS score when absent.
+        CVSS → impact mapping: [0,2) → 1, [2,4) → 2, [4,6) → 3, [6,9) → 4, [9,10] → 5.
+        Falls back to risk_level-derived value when CVSS is also unavailable.
+        """
+        if self.impact is not None:
+            return self.impact
+        cvss = self.cvss_score
+        if cvss is not None:
+            if cvss < 2.0:
+                return 1
+            if cvss < 4.0:
+                return 2
+            if cvss < 6.0:
+                return 3
+            if cvss < 9.0:
+                return 4
+            return 5
+        return {"critical": 5, "high": 4, "medium": 3, "low": 2, "info": 1}.get(self.risk_level, 3)
+
+    def effective_effort_level(self) -> str:
+        """
+        Return the stored effort_level, or derive from risk_level when blank.
+        Critical/High → high, Medium → medium, Low/Info → low.
+        """
+        if self.effort_level:
+            return self.effort_level
+        return {"critical": "high", "high": "high", "medium": "medium",
+                "low": "low", "info": "low"}.get(self.risk_level, "medium")
 
     def compute_risk_score(self) -> float:
         """
@@ -212,6 +324,9 @@ class Vulnerability(models.Model):
         return round(min(score, 10.0), 2)
 
     def save(self, *args, **kwargs) -> None:
+        # Auto-set enrichment status on creation based on CVE list presence
+        if not self.pk and not self.cve_id:
+            self.nvd_enrichment_status = self.EnrichmentStatus.SKIPPED
         # Auto-compute risk score before saving
         if self.cvss_score is not None or self.epss_score is not None:
             self.risk_score = self.compute_risk_score()

@@ -22,10 +22,6 @@ _EXPIRED_MSG = (
     "Your license has expired. "
     f"Contact {SALES_CONTACT} to purchase or renew."
 )
-_NOT_CONFIGURED_MSG = (
-    "License activation service is not reachable. "
-    f"Contact {SALES_CONTACT} for assistance."
-)
 
 
 class LicenseStatusView(APIView):
@@ -67,12 +63,6 @@ class ActivateLicenseView(APIView):
         instance_id = str(org.id)
 
         client = WPLicenseClient()
-        if not client._configured:
-            return Response(
-                {"success": False, "error": _NOT_CONFIGURED_MSG},
-                status=status.HTTP_503_SERVICE_UNAVAILABLE,
-            )
-
         try:
             license_info = client.activate_license(license_key, instance_id)
         except WPLicenseClientError as exc:
@@ -90,7 +80,11 @@ class ActivateLicenseView(APIView):
         except License.DoesNotExist:
             license_obj = License(organization=org)
 
-        license_obj.activate_pro(license_key=license_key, expires_at=expires_at)
+        license_obj.activate_pro(
+            license_key=license_key,
+            activation_token=license_info.activation_token,
+            expires_at=expires_at,
+        )
 
         AuditLog.log(
             action=AuditLog.Action.LICENSE_ACTIVATED,
@@ -127,15 +121,14 @@ class DeactivateLicenseView(APIView):
             )
 
         client = WPLicenseClient()
-        if not client._configured:
+        if not license_obj.activation_token:
             return Response(
-                {"success": False, "error": _NOT_CONFIGURED_MSG},
-                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                {"success": False, "error": "No activation token stored — cannot deactivate remotely."},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
-        instance_id = str(org.id)
         try:
-            client.deactivate_license(license_obj.license_key, instance_id)
+            client.deactivate_license(license_obj.activation_token)
         except WPLicenseClientError as exc:
             logger.warning("Remote deactivation failed for org %s: %s", org.id, exc)
             return Response(

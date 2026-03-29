@@ -525,6 +525,15 @@ export function useGenerateReport() {
       charts_enabled?: Record<string, boolean>;
       /** Chart variant selections (e.g. "Donut" vs "Pie"). */
       charts_variants?: Record<string, string>;
+      /** Per-chart customization config (caption, axis labels, legend, grid, 3D). */
+      charts_details?: Record<string, {
+        caption?: string;
+        x_axis_label?: string;
+        y_axis_label?: string;
+        show_legend?: boolean;
+        show_grid?: boolean;
+        mode_3d?: boolean;
+      }>;
     }) =>
       apiClient.post<ReportExport>("/reports/generate/", data).then((r) => r.data),
     onSuccess: (report) => {
@@ -596,15 +605,10 @@ export function useUpdateOrganization() {
   return useMutation({
     mutationFn: (data: FormData | Partial<Organization>) =>
       apiClient
-        .patch<Organization>("/auth/organization/", data, {
-          headers:
-            data instanceof FormData
-              ? { "Content-Type": "multipart/form-data" }
-              : { "Content-Type": "application/json" },
-        })
+        .patch<Organization>("/auth/organization/", data)
         .then((r) => r.data),
-    onSuccess: (org) => {
-      qc.setQueryData(queryKeys.organization, org);
+    onSuccess: (data) => {
+      qc.setQueryData(queryKeys.organization, data);
     },
   });
 }

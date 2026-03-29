@@ -106,20 +106,27 @@ class NiktoParser(BaseParser):
                 if not description:
                     continue
 
-                cve_id = self._extract_cve(description)
+                cve_str = self._extract_cve(description)
                 risk_level = self._assess_risk(description, osvdb)
 
                 evidence = f"URI: {uri}\nMethod: {method}\nDescription: {description}"
                 if osvdb:
                     evidence += f"\nOSVDB: {osvdb}"
 
+                # Parse port to int
+                port_int: int | None = None
+                try:
+                    port_int = int(target_port)
+                except (ValueError, TypeError):
+                    pass
+
                 results.append(NormalizedVulnerability(
                     title=f"Nikto: {description[:120]}",
                     description=description,
                     affected_host=target_ip,
-                    affected_port=target_port,
+                    affected_port=port_int,
                     affected_service="http",
-                    cve_id=cve_id,
+                    cve_id=[cve_str] if cve_str else [],
                     risk_level=risk_level,
                     evidence_code=evidence,
                     source=self.tool_name,

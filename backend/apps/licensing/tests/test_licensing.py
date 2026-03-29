@@ -41,7 +41,7 @@ def trial_license(db, org) -> License:
 def auth_client(db, admin_user) -> APIClient:
     client = APIClient()
     url = reverse("accounts:login")
-    resp = client.post(url, {"email": "admin@lic.com", "password": "SecurePass123!"}, format="json")
+    resp = client.post(url, {"identifier": "admin@lic.com", "password": "SecurePass123!"}, format="json")
     client.credentials(HTTP_AUTHORIZATION=f"Bearer {resp.data['access']}")
     return client
 

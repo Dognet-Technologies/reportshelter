@@ -21,6 +21,7 @@ class ReportExportSerializer(serializers.ModelSerializer):
             "status",
             "file_url",
             "error_message",
+            "report_name",
             "options",
             "generated_by",
             "created_at",
@@ -28,7 +29,7 @@ class ReportExportSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             "id", "status", "file_url", "error_message",
-            "generated_by", "created_at", "completed_at",
+            "report_name", "generated_by", "created_at", "completed_at",
         ]
 
     def get_file_url(self, obj: ReportExport) -> str | None:
@@ -111,4 +112,12 @@ class ReportGenerateSerializer(serializers.Serializer):
         child=serializers.CharField(),
         required=False,
         help_text="Chart variant selection per chart ID (e.g. 'Donut', 'Pie').",
+    )
+    charts_details = serializers.DictField(
+        required=False,
+        help_text=(
+            "Per-chart detail config keyed by chart ID. "
+            "Each value may contain: caption, x_axis_label, y_axis_label, "
+            "show_legend, show_grid, mode_3d."
+        ),
     )

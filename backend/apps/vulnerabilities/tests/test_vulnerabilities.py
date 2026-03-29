@@ -29,10 +29,12 @@ class TestVulnerabilityModel:
 
     def test_dedup_key(self, vulnerability):
         key = vulnerability.dedup_key
+        host = (vulnerability.affected_ip or vulnerability.affected_host).lower().strip()
+        port = str(vulnerability.affected_port) if vulnerability.affected_port else ""
         assert key == (
             vulnerability.title.lower().strip(),
-            vulnerability.affected_host.lower().strip(),
-            vulnerability.affected_port.strip(),
+            host,
+            port,
         )
 
     def test_compute_risk_score_cvss_only(self, subproject):
@@ -137,7 +139,7 @@ class TestScanImportModel:
 
 @pytest.mark.django_db
 class TestDeduplication:
-    def _make_norm(self, title="SQLi", host="10.0.0.1", port="443", source="nmap"):
+    def _make_norm(self, title="SQLi", host="10.0.0.1", port=443, source="nmap"):
         return NormalizedVulnerability(
             title=title,
             description="Test vuln",
@@ -184,8 +186,8 @@ class TestDeduplication:
         assert Vulnerability.objects.filter(subproject=subproject).count() == 2
 
     def test_different_port_creates_new(self, subproject):
-        norm1 = self._make_norm(port="80")
-        norm2 = self._make_norm(port="443")
+        norm1 = self._make_norm(port=80)
+        norm2 = self._make_norm(port=443)
         deduplicate_and_save([norm1, norm2], subproject.pk)
         assert Vulnerability.objects.filter(subproject=subproject).count() == 2
 
@@ -217,7 +219,7 @@ class TestDeduplication:
 
 @pytest.mark.django_db
 class TestVulnDiff:
-    def _make_vuln(self, subproject, title="SQLi", host="10.0.0.1", port="80", level="high"):
+    def _make_vuln(self, subproject, title="SQLi", host="10.0.0.1", port=80, level="high"):
         return Vulnerability.objects.create(
             subproject=subproject,
             title=title,
@@ -251,8 +253,8 @@ class TestVulnDiff:
         from datetime import date
         sp1 = SubProject.objects.create(project=project, created_by=admin_user, title="SP1", scan_date=date(2025, 1, 1))
         sp2 = SubProject.objects.create(project=project, created_by=admin_user, title="SP2", scan_date=date(2025, 2, 1))
-        self._make_vuln(sp1, title="Persistent", host="10.0.0.1", port="80", level="high")
-        self._make_vuln(sp2, title="Persistent", host="10.0.0.1", port="80", level="high")
+        self._make_vuln(sp1, title="Persistent", host="10.0.0.1", port=80, level="high")
+        self._make_vuln(sp2, title="Persistent", host="10.0.0.1", port=80, level="high")
         diff = compute_diff(sp2.pk, sp1.pk)
         assert len(diff.persistent) == 1
         # is_recurring should be set to True
@@ -264,8 +266,8 @@ class TestVulnDiff:
         from datetime import date
         sp1 = SubProject.objects.create(project=project, created_by=admin_user, title="SP1", scan_date=date(2025, 1, 1))
         sp2 = SubProject.objects.create(project=project, created_by=admin_user, title="SP2", scan_date=date(2025, 2, 1))
-        self._make_vuln(sp1, title="Changed", host="10.0.0.1", port="80", level="medium")
-        self._make_vuln(sp2, title="Changed", host="10.0.0.1", port="80", level="high")
+        self._make_vuln(sp1, title="Changed", host="10.0.0.1", port=80, level="medium")
+        self._make_vuln(sp2, title="Changed", host="10.0.0.1", port=80, level="high")
         diff = compute_diff(sp2.pk, sp1.pk)
         assert len(diff.changed) == 1
 

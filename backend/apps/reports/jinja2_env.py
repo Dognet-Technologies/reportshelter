@@ -1,5 +1,6 @@
 """Jinja2 environment factory for report templates."""
 
+import re
 from datetime import date, datetime
 
 from jinja2 import Environment
@@ -42,6 +43,14 @@ def _cvss_color(score: float | None) -> str:
     return "#2563eb"
 
 
+def _test_search(value: object, pattern: str) -> bool:
+    """
+    Jinja2 test: selectattr("field", "search", "pattern").
+    Returns True if the regex pattern matches anywhere in the string value.
+    """
+    return bool(re.search(pattern, str(value) if value is not None else ""))
+
+
 def environment(**options) -> Environment:
     """Create the Jinja2 environment with custom filters and globals."""
     env = Environment(**options)
@@ -49,4 +58,6 @@ def environment(**options) -> Environment:
     env.filters["severity_badge"] = _severity_badge
     env.filters["cvss_color"] = _cvss_color
     env.globals["now"] = datetime.utcnow
+    # Custom tests
+    env.tests["search"] = _test_search
     return env

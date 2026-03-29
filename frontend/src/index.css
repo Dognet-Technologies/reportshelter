@@ -10,6 +10,7 @@
 
   html {
     @apply antialiased;
+    font-size: 120%; /* 1rem = 19.2px instead of 16px — scales all Tailwind rem-based sizes */
   }
 
   body {

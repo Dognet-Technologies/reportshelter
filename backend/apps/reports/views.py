@@ -77,11 +77,20 @@ class ReportGenerateView(APIView):
             options["charts_enabled"] = data["charts_enabled"]
         if data.get("charts_variants"):
             options["charts_variants"] = data["charts_variants"]
+        if data.get("charts_details"):
+            options["charts_details"] = data["charts_details"]
+
+        from .generator import REPORT_TYPE_LABELS
+        report_type_val = data.get("report_type", "")
+        type_label = REPORT_TYPE_LABELS.get(report_type_val, "Security Assessment Report")
+        fmt_upper = data["format"].upper()
+        report_name = f"{type_label} · {fmt_upper}"
 
         export = ReportExport.objects.create(
             subproject=subproject,
             format=data["format"],
             options=options,
+            report_name=report_name,
             generated_by=request.user,
         )
 

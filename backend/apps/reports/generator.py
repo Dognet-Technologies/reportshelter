@@ -16,7 +16,19 @@ from django.template.loader import render_to_string
 from apps.vulnerabilities.deduplication import build_timeline
 from apps.vulnerabilities.models import RISK_LEVEL_ORDER, Vulnerability
 
-from .charts import host_bar_chart, risk_matrix_chart, severity_pie_chart, timeline_chart
+from .charts import (
+    cvss_breakdown_chart,
+    epss_distribution_chart,
+    fixed_vs_open_chart,
+    host_bar_chart,
+    remediation_effort_chart,
+    risk_gauge_chart,
+    risk_matrix_chart,
+    severity_pie_chart,
+    timeline_chart,
+    vulns_by_category_chart,
+    vulns_per_host_chart,
+)
 from .models import ReportExport
 
 # Human-readable labels for report type IDs (matches frontend reportTypes.ts).
@@ -51,10 +63,20 @@ REPORT_TYPE_LABELS: dict[str, str] = {
 
 # All known section IDs — used as fallback when sections list is empty.
 ALL_SECTIONS: set[str] = {
-    "cover", "toc", "executive_summary", "risk_summary", "scope",
-    "attack_timeline", "ioc", "vuln_details", "host_breakdown",
+    # Structural (always rendered, never counted for fallback)
+    "cover", "last_page",
+    # Universal
+    "toc", "doc_control",
+    # Main content sections (frontend section IDs)
+    "executive_summary", "findings_summary", "risk_summary",
+    "scope", "engagement_overview",
+    "attack_timeline", "attack_narrative", "attack_paths",
+    "ioc", "vuln_details", "host_breakdown",
     "remediation_plan", "diff_retest", "risk_register", "compliance_matrix",
-    "osint_findings", "recommendations", "appendix", "last_page",
+    "osint_findings", "digital_footprint", "credential_exposure",
+    "owasp_coverage", "masvs_coverage", "mitre_mapping", "detection_gap",
+    "cloud_posture_overview", "network_overview",
+    "recommendations", "appendix",
 }
 
 
@@ -154,9 +176,9 @@ class ReportGenerator:
             ET.SubElement(vuln_el, "title").text = v.title
             ET.SubElement(vuln_el, "risk_level").text = v.risk_level
             ET.SubElement(vuln_el, "status").text = v.vuln_status
-            ET.SubElement(vuln_el, "affected_host").text = v.affected_host
-            ET.SubElement(vuln_el, "affected_port").text = v.affected_port
-            ET.SubElement(vuln_el, "cve_id").text = v.cve_id
+            ET.SubElement(vuln_el, "affected_host").text = v.affected_host or ""
+            ET.SubElement(vuln_el, "affected_port").text = str(v.affected_port) if v.affected_port is not None else ""
+            ET.SubElement(vuln_el, "cve_id").text = ", ".join(v.cve_id) if v.cve_id else ""
             if v.cvss_score is not None:
                 ET.SubElement(vuln_el, "cvss_score").text = str(v.cvss_score)
             ET.SubElement(vuln_el, "description").text = v.description
@@ -273,31 +295,126 @@ class ReportGenerator:
             "references":      e.get("references", ""),
         }
 
-    def _build_charts(self, sections: set[str], vulnerabilities: list) -> dict[str, str]:
+    def _build_charts(
+        self,
+        sections: set[str],
+        vulnerabilities: list,
+        audience: str = "technical",
+    ) -> dict[str, str]:
         """
         Generate only the charts that are both enabled and relevant to active sections.
-        Falls back to the 4 default charts when no explicit chart config is present.
+        All chart functions receive the audience parameter for rendering detail control.
+
+        Chart ID mapping (frontend key → function):
+          severity_donut      → severity_pie_chart
+          risk_gauge          → risk_gauge_chart
+          trend_line          → timeline_chart
+          top_hosts_bar       → host_bar_chart
+          risk_matrix         → risk_matrix_chart
+          vuln_by_category    → vulns_by_category_chart
+          remediation_effort  → remediation_effort_chart
+          fixed_vs_open       → fixed_vs_open_chart
+          cvss_radar          → cvss_breakdown_chart
+          epss_distribution   → epss_distribution_chart
+          vuln_by_host        → vulns_per_host_chart
         """
         enabled      = self.options.get("charts_enabled") or {}
+        variants     = self.options.get("charts_variants") or {}
         use_defaults = not enabled
 
         def is_on(chart_id: str) -> bool:
-            return enabled.get(chart_id, True) if not use_defaults else True
+            return enabled.get(chart_id, False) if not use_defaults else True
 
-        charts: dict[str, str] = {"pie": "", "bar": "", "risk_matrix": "", "timeline": ""}
+        def variant_of(chart_id: str, default: str = "") -> str:
+            return variants.get(chart_id, default)
 
-        if bool({"executive_summary", "risk_summary"} & sections):
-            if is_on("severity_donut"):
-                charts["pie"] = severity_pie_chart(vulnerabilities)
-            if is_on("top_hosts_bar"):
-                charts["bar"] = host_bar_chart(vulnerabilities)
-            if is_on("risk_matrix"):
-                charts["risk_matrix"] = risk_matrix_chart(vulnerabilities)
+        charts: dict[str, str] = {
+            "pie": "",
+            "risk_gauge": "",
+            "bar": "",
+            "risk_matrix": "",
+            "timeline": "",
+            "vulns_by_category": "",
+            "remediation_effort": "",
+            "fixed_vs_open": "",
+            "cvss_breakdown": "",
+            "epss_distribution": "",
+            "vulns_per_host": "",
+        }
 
-        if ("appendix" in sections or "executive_summary" in sections) and is_on("trend_line"):
+        summary_active = bool({"executive_summary", "risk_summary", "findings_summary"} & sections)
+        vuln_active    = bool({"vuln_details", "host_breakdown", "risk_summary", "findings_summary"} & sections)
+
+        # --- severity_donut ---
+        if summary_active and is_on("severity_donut"):
+            pie_variant = variant_of("severity_donut", "Donut")
+            charts["pie"] = severity_pie_chart(
+                vulnerabilities, variant=pie_variant, audience=audience
+            )
+
+        # --- risk_gauge ---
+        if summary_active and is_on("risk_gauge"):
+            charts["risk_gauge"] = risk_gauge_chart(vulnerabilities, audience=audience)
+
+        # --- top5_hosts / host_bar ---
+        # Frontend key: "top_hosts_bar"
+        if (summary_active or vuln_active) and is_on("top_hosts_bar"):
+            charts["bar"] = host_bar_chart(vulnerabilities, audience=audience)
+
+        # --- risk_matrix ---
+        if (summary_active or vuln_active) and is_on("risk_matrix"):
+            charts["risk_matrix"] = risk_matrix_chart(vulnerabilities, audience=audience)
+
+        # --- historical_trend / timeline ---
+        # Frontend key: "trend_line"
+        timeline_active = bool(
+            {"appendix", "executive_summary", "risk_summary", "findings_summary"} & sections
+        )
+        if timeline_active and is_on("trend_line"):
             from apps.projects.models import SubProject
             if SubProject.objects.filter(project=self.project).count() > 1:
-                charts["timeline"] = timeline_chart(build_timeline(self.project.pk))
+                charts["timeline"] = timeline_chart(
+                    build_timeline(self.project.pk), audience=audience
+                )
+
+        # --- vulns_by_category ---
+        # Frontend key: "vuln_by_category"
+        if vuln_active and is_on("vuln_by_category"):
+            charts["vulns_by_category"] = vulns_by_category_chart(
+                vulnerabilities, audience=audience
+            )
+
+        # --- remediation_effort ---
+        if (vuln_active or "remediation_plan" in sections) and is_on("remediation_effort"):
+            charts["remediation_effort"] = remediation_effort_chart(
+                vulnerabilities, audience=audience
+            )
+
+        # --- fixed_vs_open ---
+        if (summary_active or "diff_retest" in sections) and is_on("fixed_vs_open"):
+            charts["fixed_vs_open"] = fixed_vs_open_chart(
+                vulnerabilities, audience=audience
+            )
+
+        # --- cvss_breakdown ---
+        # Frontend key: "cvss_radar"
+        if vuln_active and is_on("cvss_radar"):
+            charts["cvss_breakdown"] = cvss_breakdown_chart(
+                vulnerabilities, audience=audience
+            )
+
+        # --- epss_distribution ---
+        if vuln_active and is_on("epss_distribution"):
+            charts["epss_distribution"] = epss_distribution_chart(
+                vulnerabilities, audience=audience
+            )
+
+        # --- vulns_per_host ---
+        # Frontend key: "vuln_by_host"
+        if (vuln_active or "host_breakdown" in sections) and is_on("vuln_by_host"):
+            charts["vulns_per_host"] = vulns_per_host_chart(
+                vulnerabilities, audience=audience
+            )
 
         return charts
 
@@ -320,7 +437,7 @@ class ReportGenerator:
 
         rpt_style = self._build_rpt_style()
         rpt_extra = self._build_rpt_extra()
-        charts    = self._build_charts(sections, vulnerabilities)
+        charts    = self._build_charts(sections, vulnerabilities, audience=audience)
         hosts     = self._build_hosts_breakdown(vulnerabilities)
 
         context = {
