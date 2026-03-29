@@ -8,16 +8,22 @@ const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api/v1";
 
 export const apiClient = axios.create({
   baseURL: BASE_URL,
-  headers: { "Content-Type": "application/json" },
   withCredentials: false,
+  // No default Content-Type: the interceptor below sets it per-request
+  // so FormData uploads get the correct multipart/form-data boundary.
 });
 
-// Attach access token to every request
+// Attach auth token; set Content-Type only for non-FormData bodies.
 apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = useAuthStore.getState().accessToken;
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  if (!(config.data instanceof FormData)) {
+    config.headers["Content-Type"] = "application/json";
+  }
+  // For FormData, axios detects it automatically and sets the correct
+  // multipart/form-data boundary without any header override needed.
   return config;
 });
 

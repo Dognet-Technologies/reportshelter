@@ -43,12 +43,12 @@ _SEG: tuple[bytes, ...] = (
 # Application credentials (owner-side — not customer-configurable).
 # Split into byte fragments to avoid trivial grep/string extraction.
 _K: tuple[bytes, ...] = (
-    b"ck_191d", b"e0ac583", b"4b9adb4",
-    b"3b7523e", b"eaafbf6", b"a35c789c",
+    b"ck_f2cb", b"7b2eec", b"c3295a",
+    b"eede99", b"2d70ef", b"b432d3463a02",
 )
 _S: tuple[bytes, ...] = (
-    b"cs_ce1b", b"8f824c6", b"c2e2a04",
-    b"3b3356a", b"c95b125", b"3703a1b5",
+    b"cs_c79", b"193c8b", b"1567bc",
+    b"4b09ef", b"13fe62", b"ba8f574cdff9b",
 )
 _U: tuple[bytes, ...] = (
     b"https://dognet", b".tech/wp-json",
@@ -70,6 +70,7 @@ class LicenseInfo:
     expires_at: Optional[str]      # "YYYY-MM-DD HH:MM:SS" or None
     activations_limit: Optional[int]
     activations_count: int
+    activation_token: str = ""     # opaque token returned by /activate — used for validate/deactivate
 
 
 class WPLicenseClientError(Exception):
@@ -87,13 +88,11 @@ class WPLicenseClient:
     _TIMEOUT = 10  # seconds
 
     def __init__(self) -> None:
-        self._api_url = os.environ.get(
-            "WP_LICENSE_API_URL", _assemble(_U)
-        ).rstrip("/")
+        # Use the env var if set, otherwise fall back to the embedded default URL.
+        self._api_url = os.environ.get("WP_LICENSE_API_URL", _assemble(_U)).rstrip("/")
         # Application-level credentials — embedded, not customer-supplied.
         self._api_key    = _assemble(_K)
         self._api_secret = _assemble(_S)
-        self._configured = bool(self._api_url and self._api_key and self._api_secret)
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -160,55 +159,44 @@ class WPLicenseClient:
         return body
 
     @staticmethod
-    def _parse(data: dict, expected_key: str) -> LicenseInfo:
+    def _parse_license(data: dict, expected_key: str, activation_token: str = "") -> LicenseInfo:
         """
-        Convert a DLM ``data`` object into :class:`LicenseInfo`.
+        Convert a DLM license object into :class:`LicenseInfo`.
 
-        Also verifies that the returned ``licenseKey`` matches ``expected_key``
-        to guard against response-substitution.
+        The DLM API returns snake_case fields (``license_key``, ``expires_at``,
+        ``times_activated``, ``activations_limit``) inside a nested ``license``
+        sub-object for both the activate and validate routes.
+
+        Also verifies that the returned key matches ``expected_key`` to guard
+        against response-substitution attacks.
         """
-        returned_key: str = data.get("licenseKey", "")
+        returned_key: str = data.get("license_key", "")
         if returned_key and returned_key.upper() != expected_key.upper():
             raise WPLicenseClientError(
-                "DLM response licenseKey mismatch — possible response substitution."
+                "DLM response license_key mismatch — possible response substitution."
             )
 
         status_code = data.get("status")
-        status_str  = _DLM_STATUS_MAP.get(status_code, "unknown")
+        # Use is_expired field when present for a more reliable active/expired decision.
+        if data.get("is_expired") is True:
+            status_str = "expired"
+        else:
+            status_str = _DLM_STATUS_MAP.get(status_code, "unknown")
+            if status_str == "expired" and data.get("is_expired") is False:
+                status_str = "active"
 
         return LicenseInfo(
             key=returned_key or expected_key,
             status=status_str,
-            expires_at=data.get("expiresAt"),
-            activations_limit=data.get("activationsLimit"),
-            activations_count=data.get("timesActivated", 0),
+            expires_at=data.get("expires_at"),
+            activations_limit=data.get("activations_limit"),
+            activations_count=data.get("times_activated", 0),
+            activation_token=activation_token,
         )
-
-    def _require_configured(self) -> None:
-        if not self._configured:
-            raise NotImplementedError(
-                "WP_LICENSE_API_URL is not set."
-            )
 
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
-
-    def validate_license(self, license_key: str) -> LicenseInfo:
-        """
-        Retrieve current status and metadata for *license_key*.
-
-        Calls ``GET /licenses/{license_key}``.
-
-        Raises:
-            WPLicenseClientError: on API/network error.
-            NotImplementedError:  if API URL is not configured.
-        """
-        self._require_configured()
-        logger.debug("Validating key %s…", license_key[:8])
-        seg = _SEG[0].decode()
-        body = self._get(f"{seg}/{license_key}")
-        return self._parse(body["data"], license_key)
 
     def activate_license(self, license_key: str, instance_id: str) -> LicenseInfo:
         """
@@ -216,32 +204,59 @@ class WPLicenseClient:
 
         Calls ``GET /licenses/activate/{license_key}?instanceId=…``.
 
+        Returns a :class:`LicenseInfo` that includes the ``activation_token``
+        — an opaque string that must be stored and passed to :meth:`validate_license`
+        and :meth:`deactivate_license` for all subsequent calls.
+
         Raises:
-            WPLicenseClientError: if the key is invalid, exhausted, or the
-                                  API returns an error.
-            NotImplementedError:  if API URL is not configured.
+            WPLicenseClientError: if the key is invalid, exhausted, or the API returns an error.
         """
-        self._require_configured()
         logger.info("Activating key %s for instance %s", license_key[:8], instance_id)
         seg = f"{_SEG[0].decode()}/{_SEG[1].decode()}"
         body = self._get(f"{seg}/{license_key}", params={"instanceId": instance_id})
-        return self._parse(body["data"], license_key)
 
-    def deactivate_license(self, license_key: str, instance_id: str) -> bool:
+        activation_data = body["data"]
+        token: str = activation_data.get("token", "")
+        license_data: dict = activation_data.get("license", {})
+        return self._parse_license(license_data, license_key, activation_token=token)
+
+    def validate_license(self, activation_token: str) -> LicenseInfo:
         """
-        Deactivate *license_key* for *instance_id*.
+        Confirm that an existing activation is still valid.
 
-        Calls ``GET /licenses/deactivate/{license_key}?instanceId=…``.
+        Calls ``GET /licenses/validate/{activation_token}``.
+
+        Args:
+            activation_token: the opaque token returned by :meth:`activate_license`.
+
+        Raises:
+            WPLicenseClientError: on API/network error or if the token is invalid.
+        """
+        logger.debug("Validating activation token %s…", activation_token[:8])
+        seg = f"{_SEG[0].decode()}/validate"
+        body = self._get(f"{seg}/{activation_token}")
+
+        activation_data = body["data"]
+        license_data: dict = activation_data.get("license", activation_data)
+        key = license_data.get("license_key", "")
+        return self._parse_license(license_data, key, activation_token=activation_token)
+
+    def deactivate_license(self, activation_token: str) -> bool:
+        """
+        Deactivate an existing activation.
+
+        Calls ``GET /licenses/deactivate/{activation_token}``.
+
+        Args:
+            activation_token: the opaque token returned by :meth:`activate_license`.
 
         Returns:
             True if deactivated successfully.
 
         Raises:
             WPLicenseClientError: on API/network error.
-            NotImplementedError:  if API URL is not configured.
         """
-        self._require_configured()
-        logger.info("Deactivating key %s for instance %s", license_key[:8], instance_id)
+        logger.info("Deactivating activation token %s…", activation_token[:8])
         seg = f"{_SEG[0].decode()}/{_SEG[2].decode()}"
-        self._get(f"{seg}/{license_key}", params={"instanceId": instance_id})
+        self._get(f"{seg}/{activation_token}")
         return True

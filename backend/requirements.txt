@@ -26,6 +26,7 @@ django-celery-results==2.5.1
 # File processing & validation
 python-magic==0.4.27
 pillow==12.1.1
+openpyxl==3.1.5
 
 # PDF generation
 weasyprint==68.0

@@ -5,16 +5,18 @@ Usage:
     python manage.py create_default_admin
 
 The command is idempotent: if an admin user already exists it exits without
-making any changes.  The created user is flagged with must_change_password=True
-so they are prompted to set a new password on first login.
+making any changes.  The created user has credentials admin / admin and is
+flagged with must_change_password=True so they must set a new password and
+email address on first login.
 """
-
-import secrets
-import string
 
 from django.core.management.base import BaseCommand
 
 from apps.accounts.models import Organization, User
+from apps.licensing.models import License
+
+_DEFAULT_EMAIL = "admin@localhost"
+_DEFAULT_PASSWORD = "admin"
 
 
 class Command(BaseCommand):
@@ -24,18 +26,12 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser) -> None:
         parser.add_argument(
-            "--email",
-            default="admin@cyberreport.local",
-            help="Email address for the default admin (default: admin@cyberreport.local)",
-        )
-        parser.add_argument(
             "--org-name",
             default="Default Organization",
             help="Name of the default organization (default: Default Organization)",
         )
 
     def handle(self, *args, **options) -> None:
-        email: str = options["email"]
         org_name: str = options["org_name"]
 
         if User.objects.exists():
@@ -50,13 +46,9 @@ class Command(BaseCommand):
             defaults={"name": org_name},
         )
 
-        # Generate a random temporary password (16 chars, mixed)
-        alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
-        temp_password = "".join(secrets.choice(alphabet) for _ in range(16))
-
         user = User.objects.create_user(
-            email=email,
-            password=temp_password,
+            email=_DEFAULT_EMAIL,
+            password=_DEFAULT_PASSWORD,
             organization=org,
             role=User.Role.ADMIN,
             is_email_verified=True,
@@ -64,11 +56,14 @@ class Command(BaseCommand):
             is_staff=True,
         )
 
+        # Create a trial license for the new organization
+        License.create_trial(org)
+
         self.stdout.write(self.style.SUCCESS("Default admin created successfully."))
-        self.stdout.write(f"  Email:    {user.email}")
-        self.stdout.write(f"  Password: {temp_password}")
+        self.stdout.write(f"  Username: admin  (login with 'admin' or '{user.email}')")
+        self.stdout.write(f"  Password: {_DEFAULT_PASSWORD}")
         self.stdout.write(
             self.style.WARNING(
-                "  IMPORTANT: Change this password immediately after first login!"
+                "  IMPORTANT: You will be prompted to change the password and set your email on first login."
             )
         )

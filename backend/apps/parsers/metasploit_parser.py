@@ -45,7 +45,7 @@ class MetasploitParser(BaseParser):
             info = vuln.findtext("info", "").strip()
             refs_elem = vuln.find("refs")
             host_id = vuln.get("host_id", "")
-            port = vuln.findtext("port", "")
+            port_raw = vuln.findtext("port", "")
             proto = vuln.findtext("proto", "tcp")
 
             if not name:
@@ -53,7 +53,7 @@ class MetasploitParser(BaseParser):
 
             host_addr = host_map.get(host_id, "")
 
-            cve_id = ""
+            cve_ids: list[str] = []
             cvss_score = None
             refs: list[str] = []
 
@@ -61,7 +61,7 @@ class MetasploitParser(BaseParser):
                 for ref in refs_elem.findall("ref"):
                     ref_name = ref.findtext("name", "")
                     if ref_name.startswith("CVE-"):
-                        cve_id = ref_name
+                        cve_ids.append(ref_name)
                     elif ref_name.startswith("CVSS-"):
                         try:
                             cvss_score = float(ref_name.split("-")[1])
@@ -71,19 +71,26 @@ class MetasploitParser(BaseParser):
 
             risk_level = self._assess_risk(cvss_score, name, info)
 
+            # Parse port to int
+            port_int: int | None = None
+            try:
+                port_int = int(port_raw)
+            except (ValueError, TypeError):
+                pass
+
             evidence = f"Info: {info}"
             if refs:
                 evidence += f"\nReferences: {', '.join(refs[:10])}"
-            if port:
-                evidence += f"\nPort: {port}/{proto}"
+            if port_raw:
+                evidence += f"\nPort: {port_raw}/{proto}"
 
             results.append(NormalizedVulnerability(
                 title=f"MSF: {name}",
                 description=info or name,
                 affected_host=host_addr,
-                affected_port=port,
+                affected_port=port_int,
                 affected_service=proto,
-                cve_id=cve_id,
+                cve_id=cve_ids,
                 cvss_score=cvss_score,
                 risk_level=risk_level,
                 evidence_code=evidence[:4096],

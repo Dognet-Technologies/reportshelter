@@ -215,9 +215,25 @@ export interface ReportExport {
   status: ExportStatus;
   file_url: string | null;
   error_message: string;
+  report_name: string;
   options: {
     risk_levels?: RiskLevel[];
     vuln_status?: VulnStatus[];
+    report_type?: string;
+    sections?: string[];
+    audience?: string;
+    style?: Record<string, string>;
+    extra?: Record<string, unknown>;
+    charts_enabled?: Record<string, boolean>;
+    charts_variants?: Record<string, string>;
+    charts_details?: Record<string, {
+      caption?: string;
+      x_axis_label?: string;
+      y_axis_label?: string;
+      show_legend?: boolean;
+      show_grid?: boolean;
+      mode_3d?: boolean;
+    }>;
   };
   generated_by: number | null;
   created_at: string;

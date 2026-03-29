@@ -42,7 +42,7 @@ def user(db, org) -> User:
 def auth_client(api_client, user) -> APIClient:
     """Authenticated client with valid JWT."""
     url = reverse("accounts:login")
-    resp = api_client.post(url, {"email": "test@example.com", "password": "SecurePass123!"}, format="json")
+    resp = api_client.post(url, {"identifier": "test@example.com", "password": "SecurePass123!"}, format="json")
     assert resp.status_code == status.HTTP_200_OK
     api_client.credentials(HTTP_AUTHORIZATION=f"Bearer {resp.data['access']}")
     return api_client
@@ -113,31 +113,31 @@ class TestRegistration:
 class TestLogin:
     def test_login_success(self, api_client, user):
         url = reverse("accounts:login")
-        resp = api_client.post(url, {"email": "test@example.com", "password": "SecurePass123!"}, format="json")
+        resp = api_client.post(url, {"identifier": "test@example.com", "password": "SecurePass123!"}, format="json")
         assert resp.status_code == status.HTTP_200_OK
         assert "access" in resp.data
         assert "refresh" in resp.data
 
     def test_login_wrong_password(self, api_client, user):
         url = reverse("accounts:login")
-        resp = api_client.post(url, {"email": "test@example.com", "password": "wrong"}, format="json")
+        resp = api_client.post(url, {"identifier": "test@example.com", "password": "wrong"}, format="json")
         assert resp.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_login_nonexistent_user(self, api_client):
         url = reverse("accounts:login")
-        resp = api_client.post(url, {"email": "nobody@example.com", "password": "pass"}, format="json")
+        resp = api_client.post(url, {"identifier": "nobody@example.com", "password": "pass"}, format="json")
         assert resp.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_login_response_includes_must_change_password(self, api_client, user):
         url = reverse("accounts:login")
-        resp = api_client.post(url, {"email": "test@example.com", "password": "SecurePass123!"}, format="json")
+        resp = api_client.post(url, {"identifier": "test@example.com", "password": "SecurePass123!"}, format="json")
         assert resp.status_code == status.HTTP_200_OK
         assert "must_change_password" in resp.data
         assert resp.data["must_change_password"] is False
 
     def test_login_creates_audit_log(self, api_client, user):
         url = reverse("accounts:login")
-        api_client.post(url, {"email": "test@example.com", "password": "SecurePass123!"}, format="json")
+        api_client.post(url, {"identifier": "test@example.com", "password": "SecurePass123!"}, format="json")
         assert AuditLog.objects.filter(action=AuditLog.Action.USER_LOGIN, user=user).exists()
 
     def test_lockout_after_max_attempts(self, api_client, user, settings):
@@ -145,8 +145,8 @@ class TestLogin:
         settings.LOGIN_LOCKOUT_MINUTES = 15
         url = reverse("accounts:login")
         for _ in range(3):
-            api_client.post(url, {"email": "test@example.com", "password": "wrong"}, format="json")
-        resp = api_client.post(url, {"email": "test@example.com", "password": "SecurePass123!"}, format="json")
+            api_client.post(url, {"identifier": "test@example.com", "password": "wrong"}, format="json")
+        resp = api_client.post(url, {"identifier": "test@example.com", "password": "SecurePass123!"}, format="json")
         assert resp.status_code == status.HTTP_429_TOO_MANY_REQUESTS
 
 
@@ -162,7 +162,7 @@ class TestLogout:
         login_url = reverse("accounts:login")
         login_resp = api_client.post(
             login_url,
-            {"email": "test@example.com", "password": "SecurePass123!"},
+            {"identifier": "test@example.com", "password": "SecurePass123!"},
             format="json",
         )
         refresh = login_resp.data["refresh"]

@@ -13,8 +13,8 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { useDropzone } from "react-dropzone";
 import {
   Upload, Loader2, FileText, Download, Image, AlertCircle, CheckCircle2,
-  Clock, RefreshCw, Plus, ChevronRight, ChevronLeft, BarChart2, Palette, Info,
-  Database, ChevronDown, ChevronUp, X,
+  Clock, RefreshCw, Plus, ChevronRight, ChevronLeft, Palette, Info,
+  Database, ChevronDown, ChevronUp, X, ExternalLink,
 } from "lucide-react";
 import { format } from "date-fns";
 import toast from "react-hot-toast";
@@ -80,33 +80,6 @@ const REPORT_TYPES: ReportTypeInfo[] = [
   { id: "lessons_learned",label:"Post-Incident Lessons Learned", desc: "RCA, process improvements",                    audience: ["executive","management"],             category: "Breach & Incident" },
 ];
 
-interface ChartDef {
-  id: string;
-  label: string;
-  icon: string;
-  desc: string;
-  section: string;
-  variants: string[];
-  defaultVariant: string;
-  recommendedFor: ReportTypeId[];
-}
-
-const CHARTS: ChartDef[] = [
-  // Executive charts
-  { id: "severity_donut",   label: "Severity Distribution",     icon: "🍩", desc: "Donut/pie of vuln counts by severity",          section: "Executive",  variants: ["Donut","Pie"],                     defaultVariant: "Donut",   recommendedFor: ["pentest","va","red_team","web_app","cloud","network","executive","retest"] },
-  { id: "risk_gauge",       label: "Risk Gauge",                 icon: "🎯", desc: "Overall risk score (0–100)",                    section: "Executive",  variants: ["Gauge","Semaphore"],               defaultVariant: "Gauge",   recommendedFor: ["pentest","va","executive","compliance","retest"] },
-  { id: "trend_line",       label: "Historical Trend",           icon: "📈", desc: "Vuln count over time across sub-projects",      section: "Executive",  variants: ["Line","Area"],                     defaultVariant: "Line",    recommendedFor: ["pentest","va","retest","risk_register"] },
-  { id: "top_hosts_bar",    label: "Top 5 Exposed Hosts",        icon: "🖥️", desc: "Hosts with most critical vulnerabilities",      section: "Executive",  variants: ["Horizontal Bar"],                  defaultVariant: "Horizontal Bar", recommendedFor: ["pentest","va","network","cloud","executive"] },
-  // Results charts
-  { id: "risk_matrix",      label: "Risk Matrix",                icon: "🗓️", desc: "Likelihood × Impact heatmap",                   section: "Results",    variants: ["Heatmap","Bubble"],                defaultVariant: "Heatmap", recommendedFor: ["pentest","va","red_team","compliance","risk_register"] },
-  { id: "vuln_by_category", label: "Vulns by Category",          icon: "📊", desc: "Findings grouped by type (OWASP, etc.)",        section: "Results",    variants: ["Bar","Grouped Bar"],               defaultVariant: "Bar",     recommendedFor: ["web_app","mobile_app","pentest","va","compliance"] },
-  { id: "remediation_effort",label:"Remediation Effort",         icon: "🔧", desc: "Estimated effort by severity band",             section: "Results",    variants: ["Stacked Bar"],                     defaultVariant: "Stacked Bar", recommendedFor: ["remediation","pentest","va","retest"] },
-  { id: "fixed_vs_open",    label: "Fixed vs Open",              icon: "✅", desc: "Remediation progress",                          section: "Results",    variants: ["Donut","Progress Bar"],            defaultVariant: "Donut",   recommendedFor: ["retest","remediation","patch_mgmt"] },
-  // Technical charts
-  { id: "cvss_radar",       label: "CVSS Breakdown",             icon: "🕸️", desc: "CVSS vector components (AV/AC/PR/UI/…)",        section: "Technical",  variants: ["Radar"],                           defaultVariant: "Radar",   recommendedFor: ["pentest","va","web_app","cloud","network"] },
-  { id: "epss_distribution",label:"EPSS Distribution",           icon: "🎲", desc: "Exploit probability distribution",              section: "Technical",  variants: ["Histogram","Bar"],                 defaultVariant: "Histogram", recommendedFor: ["pentest","va","threat_intel","patch_mgmt"] },
-  { id: "vuln_by_host",     label: "Vulns per Host",             icon: "🔢", desc: "Breakdown of findings per IP/hostname",         section: "Technical",  variants: ["Bar","Treemap"],                   defaultVariant: "Bar",     recommendedFor: ["pentest","va","network","cloud","it_infra"] },
-];
 
 const FONTS = ["Inter","Roboto","Source Sans Pro","Open Sans","Montserrat","IBM Plex Sans","Ubuntu Mono"];
 const AUDIENCE_LABELS: Record<string, string> = {
@@ -137,7 +110,7 @@ const DEFAULT_EXTRA: ExtraConfig  = { classification: "CONFIDENTIAL", version: "
 
 // ─── Panel Type ───────────────────────────────────────────────────────────────
 
-type PanelId = "report_type" | "charts" | "style" | "extra" | "scans";
+type PanelId = "report_type" | "style" | "extra" | "scans";
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -215,74 +188,7 @@ function ReportTypePanel({ selectedType, audience, onTypeChange, onAudienceChang
   );
 }
 
-// ─── Panel 2: Charts ──────────────────────────────────────────────────────────
-
-interface ChartsPanelProps {
-  selectedType: ReportTypeId | "";
-  enabledCharts: Record<string, boolean>;
-  chartVariants: Record<string, string>;
-  onToggle: (id: string) => void;
-  onVariant: (id: string, v: string) => void;
-}
-
-function ChartsPanel({ selectedType, enabledCharts, chartVariants, onToggle, onVariant }: ChartsPanelProps) {
-  const sections = Array.from(new Set(CHARTS.map((c) => c.section)));
-  return (
-    <div className="space-y-5">
-      {sections.map((sec) => (
-        <div key={sec}>
-          <p className="text-xs text-slate-500 uppercase tracking-wider font-medium mb-2">{sec} Charts</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-            {CHARTS.filter((c) => c.section === sec).map((chart) => {
-              const isRecommended = selectedType && chart.recommendedFor.includes(selectedType as ReportTypeId);
-              const enabled = enabledCharts[chart.id] ?? false;
-              return (
-                <div
-                  key={chart.id}
-                  className={`rounded-lg border px-3 py-2.5 transition-colors ${
-                    enabled ? "border-blue-600/70 bg-blue-950/30" : "border-slate-700"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-base">{chart.icon}</span>
-                        <span className={`text-xs font-medium ${enabled ? "text-blue-200" : "text-slate-300"}`}>
-                          {chart.label}
-                        </span>
-                        {isRecommended && (
-                          <span className="text-[10px] px-1 rounded bg-blue-900/60 text-blue-400 shrink-0">rec</span>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-slate-500 mt-0.5">{chart.desc}</p>
-                    </div>
-                    <button
-                      onClick={() => onToggle(chart.id)}
-                      className={`mt-0.5 w-8 h-4 rounded-full relative transition-colors shrink-0 ${enabled ? "bg-blue-600" : "bg-slate-700"}`}
-                    >
-                      <span className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-transform ${enabled ? "translate-x-4" : "translate-x-0.5"}`} />
-                    </button>
-                  </div>
-                  {enabled && chart.variants.length > 1 && (
-                    <select
-                      value={chartVariants[chart.id] ?? chart.defaultVariant}
-                      onChange={(e) => onVariant(chart.id, e.target.value)}
-                      className="mt-2 input py-0.5 text-xs w-full"
-                    >
-                      {chart.variants.map((v) => <option key={v} value={v}>{v}</option>)}
-                    </select>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ─── Panel 3: Style ───────────────────────────────────────────────────────────
+// ─── Panel 2: Style ───────────────────────────────────────────────────────────
 
 function StylePanel({ style, onChange }: { style: StyleConfig; onChange: (s: StyleConfig) => void }) {
   const set = (k: keyof StyleConfig, v: string) => onChange({ ...style, [k]: v });
@@ -651,10 +557,6 @@ export default function SubProjectPage() {
   const [activePanel,    setActivePanel]    = useState<PanelId | null>(null);
   const [reportType,     setReportType]     = useState<ReportTypeId | "">("");
   const [audience,       setAudience]       = useState<string[]>(["management","technical"]);
-  const [enabledCharts,  setEnabledCharts]  = useState<Record<string, boolean>>({
-    severity_donut: true, risk_gauge: true, top_hosts_bar: true,
-  });
-  const [chartVariants,  setChartVariants]  = useState<Record<string, string>>({});
   const [style,          setStyle]          = useState<StyleConfig>(DEFAULT_STYLE);
   const [extra,          setExtra]          = useState<ExtraConfig>(DEFAULT_EXTRA);
   const [selectedScanIds,setSelectedScanIds]= useState<Set<number>>(new Set());
@@ -663,10 +565,7 @@ export default function SubProjectPage() {
   const STATUSES:    VulnStatus[] = ["open","fixed","accepted","retest"];
 
   function togglePanel(id: PanelId) { setActivePanel((p) => (p === id ? null : id)); }
-  function toggleChart(id: string)  { setEnabledCharts((p) => ({ ...p, [id]: !p[id] })); }
-  function setChartVariant(id: string, v: string) { setChartVariants((p) => ({ ...p, [id]: v })); }
 
-  const enabledChartCount = Object.values(enabledCharts).filter(Boolean).length;
   const reportTypeLabel   = REPORT_TYPES.find((r) => r.id === reportType)?.label;
   const doneScansCount    = (scanImports ?? []).filter((s) => s.status === "done").length;
 
@@ -703,21 +602,18 @@ export default function SubProjectPage() {
         </div>
         <Link
           to={`/projects/${pId}/reports/builder/${spId}`}
-          state={{ reportType, audience, style, extra, enabledCharts, chartVariants }}
+          state={{ reportType, audience, style, extra }}
           className="btn-primary shrink-0"
         >
           <FileText className="h-4 w-4" />Generate Report
         </Link>
       </div>
 
-      {/* 5-button Report Config Toolbar */}
+      {/* Report Config Toolbar */}
       <div className="flex gap-2 flex-wrap mb-3">
         <ToolbarButton id="report_type" active={activePanel === "report_type"} icon={<FileText className="h-4 w-4" />}
           label="Report Type" badge={reportTypeLabel ? reportTypeLabel.split(" ").slice(0, 2).join(" ") : undefined}
           onClick={() => togglePanel("report_type")} />
-        <ToolbarButton id="charts" active={activePanel === "charts"} icon={<BarChart2 className="h-4 w-4" />}
-          label="Charts" badge={enabledChartCount > 0 ? `${enabledChartCount} active` : undefined}
-          onClick={() => togglePanel("charts")} />
         <ToolbarButton id="style" active={activePanel === "style"} icon={<Palette className="h-4 w-4" />}
           label="Style" badge={style.font !== "Inter" ? style.font : undefined}
           onClick={() => togglePanel("style")} />
@@ -734,9 +630,6 @@ export default function SubProjectPage() {
         <div className="card mb-5 border-slate-700/80">
           {activePanel === "report_type" && (
             <ReportTypePanel selectedType={reportType} audience={audience} onTypeChange={setReportType} onAudienceChange={setAudience} />
-          )}
-          {activePanel === "charts" && (
-            <ChartsPanel selectedType={reportType} enabledCharts={enabledCharts} chartVariants={chartVariants} onToggle={toggleChart} onVariant={setChartVariant} />
           )}
           {activePanel === "style" && (
             <StylePanel style={style} onChange={setStyle} />
@@ -781,30 +674,58 @@ export default function SubProjectPage() {
           <div className="card">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold text-slate-100 flex items-center gap-2 text-sm"><FileText className="h-4 w-4" />Exports</h3>
-              <Link to={`/projects/${pId}/reports/builder/${spId}`} state={{ reportType, audience, style, extra, enabledCharts, chartVariants }} className="btn-primary text-xs py-1.5"><Plus className="h-3.5 w-3.5" />Generate</Link>
+              <Link to={`/projects/${pId}/reports/builder/${spId}`} state={{ reportType, audience, style, extra }} className="btn-primary text-xs py-1.5"><Plus className="h-3.5 w-3.5" />Generate</Link>
             </div>
             {!exports?.length ? (
               <p className="text-slate-500 text-sm text-center py-3">No reports yet.</p>
             ) : (
               <div className="space-y-2">
                 {exports.slice(0, 5).map((exp) => (
-                  <div key={exp.id} className="flex items-center justify-between py-1.5 border-b border-slate-800 last:border-0">
-                    <div className="flex items-center gap-2">
-                      {exp.status === "done"      ? <CheckCircle2 className="h-3.5 w-3.5 text-green-400" />
-                       : exp.status === "failed"  ? <AlertCircle  className="h-3.5 w-3.5 text-red-400" />
-                       : exp.status === "generating" ? <RefreshCw className="h-3.5 w-3.5 text-blue-400 animate-spin" />
-                       : <Clock className="h-3.5 w-3.5 text-amber-400" />}
-                      <span className="text-xs text-slate-300 uppercase">{exp.format}</span>
-                      <span className="text-xs text-slate-500">{format(new Date(exp.created_at),"MMM d")}</span>
+                  <div key={exp.id} className="py-1.5 border-b border-slate-800 last:border-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        {exp.status === "done"        ? <CheckCircle2 className="h-3.5 w-3.5 text-green-400 shrink-0" />
+                         : exp.status === "failed"    ? <AlertCircle  className="h-3.5 w-3.5 text-red-400 shrink-0" />
+                         : exp.status === "generating"? <RefreshCw    className="h-3.5 w-3.5 text-blue-400 animate-spin shrink-0" />
+                         : <Clock className="h-3.5 w-3.5 text-amber-400 shrink-0" />}
+                        <span className="text-xs text-slate-200 font-medium truncate">
+                          {exp.report_name || exp.format.toUpperCase()}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={() => navigate(`/projects/${pId}/reports/builder/${spId}`, {
+                            state: {
+                              reportType: exp.options.report_type,
+                              audience: exp.options.audience ? [exp.options.audience] : undefined,
+                              style: exp.options.style,
+                              extra: exp.options.extra,
+                              enabledCharts: exp.options.charts_enabled,
+                              chartVariants: exp.options.charts_variants,
+                              sections: exp.options.sections,
+                              format: exp.format,
+                              risk_levels: exp.options.risk_levels,
+                              statuses: exp.options.vuln_status,
+                            }
+                          })}
+                          className="btn-ghost text-xs py-1 text-blue-400 hover:text-blue-300"
+                          title="Reopen in builder"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                        </button>
+                        {exp.status === "done" && (
+                          <button
+                            onClick={() => downloadReport(exp.id, exp.format).catch(() => toast.error("Download failed."))}
+                            className="btn-secondary text-xs py-1"
+                          >
+                            <Download className="h-3 w-3" />
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    {exp.status === "done" && (
-                      <button
-                        onClick={() => downloadReport(exp.id, exp.format).catch(() => toast.error("Download failed."))}
-                        className="btn-secondary text-xs py-1"
-                      >
-                        <Download className="h-3 w-3" />
-                      </button>
-                    )}
+                    <p className="text-[11px] text-slate-500 ml-5 mt-0.5">
+                      {exp.format.toUpperCase()} · {format(new Date(exp.created_at), "MMM d, HH:mm")}
+                    </p>
                   </div>
                 ))}
               </div>

@@ -266,19 +266,33 @@
     <h2>Table of Contents</h2>
     <ol style="margin-left:20px; line-height:2;">
       {% for sid in ordered_sections %}
-        {% if   sid == 'executive_summary' or sid == 'risk_summary' %}<li>Executive Summary</li>
-        {% elif sid == 'scope'             %}<li>Scope &amp; Methodology</li>
-        {% elif sid == 'vuln_details'      %}<li>Vulnerability Overview &amp; Detailed Findings</li>
-        {% elif sid == 'host_breakdown'    %}<li>Host Breakdown</li>
-        {% elif sid == 'remediation_plan'  %}<li>Remediation Plan</li>
-        {% elif sid == 'attack_timeline'   %}<li>Attack Timeline</li>
-        {% elif sid == 'ioc'               %}<li>Indicators of Compromise</li>
-        {% elif sid == 'diff_retest'       %}<li>Retest Comparison</li>
-        {% elif sid == 'risk_register'     %}<li>Risk Register</li>
-        {% elif sid == 'compliance_matrix' %}<li>Compliance Matrix</li>
-        {% elif sid == 'osint_findings'    %}<li>OSINT Findings</li>
-        {% elif sid == 'recommendations'   %}<li>Recommendations</li>
-        {% elif sid == 'appendix'          %}<li>Appendices</li>
+        {% if   sid == 'doc_control'            %}<li>Document Control</li>
+        {% elif sid == 'executive_summary'      %}<li>Executive Summary</li>
+        {% elif sid == 'findings_summary'       %}<li>Findings Summary</li>
+        {% elif sid == 'risk_summary'           %}<li>Risk Summary</li>
+        {% elif sid == 'scope'                  %}<li>Scope &amp; Methodology</li>
+        {% elif sid == 'engagement_overview'    %}<li>Engagement Overview</li>
+        {% elif sid == 'vuln_details'           %}<li>Vulnerability Overview &amp; Detailed Findings</li>
+        {% elif sid == 'host_breakdown'         %}<li>Host Breakdown</li>
+        {% elif sid == 'remediation_plan'       %}<li>Remediation Plan</li>
+        {% elif sid == 'attack_timeline'        %}<li>Attack Timeline</li>
+        {% elif sid == 'attack_narrative'       %}<li>Attack Narrative</li>
+        {% elif sid == 'attack_paths'           %}<li>Attack Paths</li>
+        {% elif sid == 'ioc'                    %}<li>Indicators of Compromise</li>
+        {% elif sid == 'diff_retest'            %}<li>Retest Comparison</li>
+        {% elif sid == 'risk_register'          %}<li>Risk Register</li>
+        {% elif sid == 'compliance_matrix'      %}<li>Compliance Matrix</li>
+        {% elif sid == 'osint_findings'         %}<li>OSINT Findings</li>
+        {% elif sid == 'digital_footprint'      %}<li>Digital Footprint</li>
+        {% elif sid == 'credential_exposure'    %}<li>Credential Exposure</li>
+        {% elif sid == 'owasp_coverage'         %}<li>OWASP Coverage</li>
+        {% elif sid == 'masvs_coverage'         %}<li>MASVS Coverage</li>
+        {% elif sid == 'mitre_mapping'          %}<li>MITRE ATT&amp;CK Mapping</li>
+        {% elif sid == 'detection_gap'          %}<li>Detection Gap Analysis</li>
+        {% elif sid == 'cloud_posture_overview' %}<li>Cloud Posture Overview</li>
+        {% elif sid == 'network_overview'       %}<li>Network Overview</li>
+        {% elif sid == 'recommendations'        %}<li>Recommendations</li>
+        {% elif sid == 'appendix'               %}<li>Appendices</li>
         {% endif %}
       {% endfor %}
     </ol>
@@ -326,6 +340,19 @@
       <img class="chart-img" src="data:image/png;base64,{{ charts.risk_matrix }}" />
     </div>
     {% endif %}
+    {# Additional charts for this section #}
+    <div class="chart-grid">
+      {% if charts.risk_gauge %}
+      <div class="chart-half">
+        <img class="chart-img" src="data:image/png;base64,{{ charts.risk_gauge }}" />
+      </div>
+      {% endif %}
+      {% if charts.fixed_vs_open %}
+      <div class="chart-half">
+        <img class="chart-img" src="data:image/png;base64,{{ charts.fixed_vs_open }}" />
+      </div>
+      {% endif %}
+    </div>
     {% endif %}
   </div>
   {% endmacro %}
@@ -364,6 +391,18 @@
       <img class="chart-img" src="data:image/png;base64,{{ charts.risk_matrix }}" />
     </div>
     {% endif %}
+    <div class="chart-grid">
+      {% if charts.risk_gauge %}
+      <div class="chart-half">
+        <img class="chart-img" src="data:image/png;base64,{{ charts.risk_gauge }}" />
+      </div>
+      {% endif %}
+      {% if charts.fixed_vs_open %}
+      <div class="chart-half">
+        <img class="chart-img" src="data:image/png;base64,{{ charts.fixed_vs_open }}" />
+      </div>
+      {% endif %}
+    </div>
   </div>
   {% endif %}
   {% endmacro %}
@@ -407,6 +446,36 @@
   {% macro mac_vuln_details() %}
   <div class="page-break">
     <h2>Vulnerability Overview</h2>
+    {# Chart row for this section #}
+    <div class="chart-grid">
+      {% if charts.vulns_by_category %}
+      <div class="chart-half">
+        <img class="chart-img" src="data:image/png;base64,{{ charts.vulns_by_category }}" />
+      </div>
+      {% endif %}
+      {% if charts.remediation_effort %}
+      <div class="chart-half">
+        <img class="chart-img" src="data:image/png;base64,{{ charts.remediation_effort }}" />
+      </div>
+      {% endif %}
+    </div>
+    <div class="chart-grid">
+      {% if charts.cvss_breakdown %}
+      <div class="chart-half">
+        <img class="chart-img" src="data:image/png;base64,{{ charts.cvss_breakdown }}" />
+      </div>
+      {% endif %}
+      {% if charts.epss_distribution %}
+      <div class="chart-half">
+        <img class="chart-img" src="data:image/png;base64,{{ charts.epss_distribution }}" />
+      </div>
+      {% endif %}
+    </div>
+    {% if charts.vulns_per_host %}
+    <div class="chart-full" style="margin-bottom:16px;">
+      <img class="chart-img" src="data:image/png;base64,{{ charts.vulns_per_host }}" />
+    </div>
+    {% endif %}
     {% if vulnerabilities %}
     <table class="vuln-table">
       <thead>
@@ -612,6 +681,358 @@
   </div>
   {% endmacro %}
 
+  {# ── Document Control ── #}
+  {% macro mac_doc_control() %}
+  <div class="page-break">
+    <h2>Document Control</h2>
+    <table class="vuln-table" style="width:60%;">
+      <thead><tr><th>Field</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Classification</td><td>{{ rpt_extra.classification }}</td></tr>
+        <tr><td>Version</td><td>{{ rpt_extra.version }}</td></tr>
+        <tr><td>Prepared by</td><td>{{ rpt_extra.authors or org.name }}</td></tr>
+        <tr><td>Client</td><td>{{ project.client_name or "—" }}</td></tr>
+        <tr><td>Date</td><td>{{ subproject.scan_date|format_date if subproject.scan_date else now()|format_date }}</td></tr>
+      </tbody>
+    </table>
+  </div>
+  {% endmacro %}
+
+  {# ── Findings Summary ── #}
+  {% macro mac_findings_summary() %}
+  <div class="page-break">
+    <h2>Findings Summary</h2>
+    <div class="kpi-row">
+      <div class="kpi-box">
+        <div class="kpi-number">{{ vulnerabilities|length }}</div>
+        <div class="kpi-label">Total</div>
+      </div>
+      {% for level in ["critical", "high", "medium", "low", "info"] %}
+      <div class="kpi-box {{ level }}">
+        <div class="kpi-number">{{ severity_counts.get(level, 0) }}</div>
+        <div class="kpi-label">{{ level|capitalize }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="chart-grid">
+      {% if charts.pie %}
+      <div class="chart-half">
+        <img class="chart-img" src="data:image/png;base64,{{ charts.pie }}" />
+      </div>
+      {% endif %}
+      {% if charts.risk_gauge %}
+      <div class="chart-half">
+        <img class="chart-img" src="data:image/png;base64,{{ charts.risk_gauge }}" />
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endmacro %}
+
+  {# ── Attack Narrative ── #}
+  {% macro mac_attack_narrative() %}
+  <div class="page-break">
+    <h2>Attack Narrative</h2>
+    <p>
+      This section describes the attack chain and exploitation path followed during the engagement,
+      from initial access through to the final objective.
+    </p>
+    <p style="color:#6b7280;font-style:italic;">
+      Detailed attack narrative to be completed by the assessor based on engagement notes.
+    </p>
+  </div>
+  {% endmacro %}
+
+  {# ── Attack Paths ── #}
+  {% macro mac_attack_paths() %}
+  <div class="page-break">
+    <h2>Attack Paths</h2>
+    <p>
+      Potential and observed attack paths identified during the assessment,
+      including lateral movement vectors and privilege escalation routes.
+    </p>
+    {% if vulnerabilities %}
+    <table class="vuln-table">
+      <thead><tr><th>#</th><th>Entry Point</th><th>Pivot</th><th>Objective</th><th>Severity</th></tr></thead>
+      <tbody>
+        {% for v in vulnerabilities if v.risk_level in ['critical','high'] %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ v.affected_host or "—" }}{% if v.affected_port %}:{{ v.affected_port }}{% endif %}</td>
+          <td>{{ v.affected_service or "—" }}</td>
+          <td>{{ v.title[:60] }}</td>
+          <td><span class="badge badge-{{ v.risk_level }}">{{ v.risk_level|upper }}</span></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" style="color:#6b7280;font-style:italic;">No critical/high findings to display.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </div>
+  {% endmacro %}
+
+  {# ── Cloud Posture Overview ── #}
+  {% macro mac_cloud_posture_overview() %}
+  <div class="page-break">
+    <h2>Cloud Posture Overview</h2>
+    <p>High-level assessment of cloud infrastructure security posture across assessed services.</p>
+    {% if vulnerabilities %}
+    <div class="chart-grid">
+      {% if charts.vulns_by_category %}
+      <div class="chart-full">
+        <img class="chart-img" src="data:image/png;base64,{{ charts.vulns_by_category }}" />
+      </div>
+      {% endif %}
+    </div>
+    <table class="vuln-table">
+      <thead><tr><th>#</th><th>Service / Resource</th><th>Finding</th><th>Severity</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for v in vulnerabilities %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ v.affected_host or "—" }}</td>
+          <td>{{ v.title }}</td>
+          <td><span class="badge badge-{{ v.risk_level }}">{{ v.risk_level|upper }}</span></td>
+          <td>{{ v.vuln_status|replace("_", " ")|capitalize }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p style="color:#6b7280;font-style:italic;">No cloud posture findings recorded.</p>
+    {% endif %}
+  </div>
+  {% endmacro %}
+
+  {# ── Network Overview ── #}
+  {% macro mac_network_overview() %}
+  <div class="page-break">
+    <h2>Network Overview</h2>
+    <p>Summary of network assets, open services, and exposure identified during the assessment.</p>
+    {% if charts.bar %}
+    <div class="chart-full" style="margin-bottom:16px;">
+      <img class="chart-img" src="data:image/png;base64,{{ charts.bar }}" />
+    </div>
+    {% endif %}
+    {% if hosts %}
+    <h3>Discovered Hosts</h3>
+    <table class="vuln-table">
+      <thead><tr><th>Host</th><th>Total Findings</th><th>Critical</th><th>High</th></tr></thead>
+      <tbody>
+        {% for host_name, host_vulns in hosts.items() %}
+        <tr>
+          <td>{{ host_name }}</td>
+          <td>{{ host_vulns|length }}</td>
+          <td>{{ host_vulns|selectattr("risk_level", "equalto", "critical")|list|length }}</td>
+          <td>{{ host_vulns|selectattr("risk_level", "equalto", "high")|list|length }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </div>
+  {% endmacro %}
+
+  {# ── OWASP Coverage ── #}
+  {% macro mac_owasp_coverage() %}
+  <div class="page-break">
+    <h2>OWASP Coverage</h2>
+    <p>Mapping of findings to the OWASP Top 10 risk categories.</p>
+    {% if charts.vulns_by_category %}
+    <div class="chart-full" style="margin-bottom:16px;">
+      <img class="chart-img" src="data:image/png;base64,{{ charts.vulns_by_category }}" />
+    </div>
+    {% endif %}
+    <table class="vuln-table">
+      <thead><tr><th>#</th><th>OWASP Category</th><th>Findings</th></tr></thead>
+      <tbody>
+        {% set owasp_cats = {} %}
+        {% for v in vulnerabilities %}
+          {% if v.category and v.category.startswith('A0') %}
+            {# group by category #}
+          {% endif %}
+        {% endfor %}
+        {% for v in vulnerabilities if v.category %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ v.category }}</td>
+          <td>{{ v.title[:80] }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="3" style="color:#6b7280;font-style:italic;">No OWASP category data available. Ensure parsers populate the category field.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endmacro %}
+
+  {# ── MASVS Coverage ── #}
+  {% macro mac_masvs_coverage() %}
+  <div class="page-break">
+    <h2>MASVS Coverage</h2>
+    <p>Mapping of findings to OWASP Mobile Application Security Verification Standard controls.</p>
+    {% if charts.vulns_by_category %}
+    <div class="chart-full" style="margin-bottom:16px;">
+      <img class="chart-img" src="data:image/png;base64,{{ charts.vulns_by_category }}" />
+    </div>
+    {% endif %}
+    <table class="vuln-table">
+      <thead><tr><th>#</th><th>MASVS Control</th><th>Finding</th><th>Severity</th></tr></thead>
+      <tbody>
+        {% for v in vulnerabilities if v.category %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ v.category }}</td>
+          <td>{{ v.title[:80] }}</td>
+          <td><span class="badge badge-{{ v.risk_level }}">{{ v.risk_level|upper }}</span></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" style="color:#6b7280;font-style:italic;">No MASVS category data available.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endmacro %}
+
+  {# ── Engagement Overview ── #}
+  {% macro mac_engagement_overview() %}
+  <div class="page-break">
+    <h2>Engagement Overview</h2>
+    <table class="vuln-table" style="width:70%;">
+      <thead><tr><th>Parameter</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Engagement Type</td><td>{{ rpt_extra.engagement_type|replace("_"," ")|capitalize or "—" }}</td></tr>
+        <tr><td>Target</td><td>{{ project.client_name or "—" }}</td></tr>
+        <tr><td>Assessment Period</td><td>{{ subproject.scan_date|format_date if subproject.scan_date else "—" }}</td></tr>
+        <tr><td>Scope</td><td>{{ rpt_extra.scope or "See Scope section." }}</td></tr>
+        <tr><td>Methodology</td><td>{{ rpt_extra.methodologies|join(", ") if rpt_extra.methodologies else "PTES / OWASP" }}</td></tr>
+        <tr><td>Report Version</td><td>{{ rpt_extra.version }}</td></tr>
+      </tbody>
+    </table>
+  </div>
+  {% endmacro %}
+
+  {# ── MITRE ATT&CK Mapping ── #}
+  {% macro mac_mitre_mapping() %}
+  <div class="page-break">
+    <h2>MITRE ATT&amp;CK Mapping</h2>
+    <p>
+      The following table maps findings to MITRE ATT&amp;CK tactics and techniques
+      to support threat modelling and detection engineering.
+    </p>
+    <table class="vuln-table">
+      <thead><tr><th>#</th><th>Finding</th><th>Tactic</th><th>Technique</th><th>Severity</th></tr></thead>
+      <tbody>
+        {% for v in vulnerabilities %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ v.title[:60] }}</td>
+          <td style="color:#6b7280;font-style:italic;">—</td>
+          <td style="color:#6b7280;font-style:italic;">—</td>
+          <td><span class="badge badge-{{ v.risk_level }}">{{ v.risk_level|upper }}</span></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" style="color:#6b7280;font-style:italic;">No findings available.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p style="color:#6b7280;font-size:8.5pt;margin-top:8px;">
+      MITRE technique mapping requires manual annotation by the assessor.
+    </p>
+  </div>
+  {% endmacro %}
+
+  {# ── Detection Gap ── #}
+  {% macro mac_detection_gap() %}
+  <div class="page-break">
+    <h2>Detection Gap Analysis</h2>
+    <p>
+      This section highlights areas where the organization's detection and response
+      capabilities may be insufficient to identify or contain the identified threats.
+    </p>
+    <table class="vuln-table">
+      <thead><tr><th>#</th><th>Attack Technique</th><th>Detection Capability</th><th>Gap</th></tr></thead>
+      <tbody>
+        {% for v in vulnerabilities if v.risk_level in ['critical', 'high'] %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ v.title[:60] }}</td>
+          <td style="color:#6b7280;font-style:italic;">Unknown</td>
+          <td style="color:#dc2626;">Requires review</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" style="color:#6b7280;font-style:italic;">No critical/high findings requiring detection gap review.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p style="color:#6b7280;font-size:8.5pt;margin-top:8px;">
+      Detection gap assessment requires input from the client's SOC/detection engineering team.
+    </p>
+  </div>
+  {% endmacro %}
+
+  {# ── Digital Footprint ── #}
+  {% macro mac_digital_footprint() %}
+  <div class="page-break">
+    <h2>Digital Footprint</h2>
+    <p>
+      Results of passive reconnaissance and OSINT activities identifying
+      the organization's publicly exposed attack surface.
+    </p>
+    <p style="color:#6b7280;font-style:italic;">
+      Digital footprint data to be populated from OSINT collection tools
+      (Shodan, WHOIS, Certificate Transparency, Google Dorks, etc.).
+    </p>
+    {% if vulnerabilities %}
+    <h3>Exposed Assets</h3>
+    <table class="vuln-table">
+      <thead><tr><th>#</th><th>Asset</th><th>Exposure</th><th>Severity</th></tr></thead>
+      <tbody>
+        {% for v in vulnerabilities %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ v.affected_host or "—" }}{% if v.affected_port %}:{{ v.affected_port }}{% endif %}</td>
+          <td>{{ v.title[:60] }}</td>
+          <td><span class="badge badge-{{ v.risk_level }}">{{ v.risk_level|upper }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </div>
+  {% endmacro %}
+
+  {# ── Credential Exposure ── #}
+  {% macro mac_credential_exposure() %}
+  <div class="page-break">
+    <h2>Credential Exposure</h2>
+    <p>
+      Findings related to leaked, weak, or exposed credentials discovered
+      during the assessment phase.
+    </p>
+    {% set cred_vulns = vulnerabilities|selectattr("title", "search", "(?i)(credential|password|auth|login|hash|leak)")|list %}
+    {% if cred_vulns %}
+    <table class="vuln-table">
+      <thead><tr><th>#</th><th>Finding</th><th>Host</th><th>Severity</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for v in cred_vulns %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ v.title }}</td>
+          <td>{{ v.affected_host or "—" }}</td>
+          <td><span class="badge badge-{{ v.risk_level }}">{{ v.risk_level|upper }}</span></td>
+          <td>{{ v.vuln_status|replace("_", " ")|capitalize }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p style="color:#6b7280;font-style:italic;">No credential exposure findings identified.</p>
+    {% endif %}
+  </div>
+  {% endmacro %}
+
   {# ── Appendix ── #}
   {% macro mac_appendix() %}
   <div class="page-break">
@@ -677,21 +1098,34 @@
      CONTENT SECTIONS — rendered in user-defined order
      ================================================================ #}
   {% for sec_id in ordered_sections %}
-    {% if   sec_id == 'toc'               %}{{ mac_toc() }}
-    {% elif sec_id == 'executive_summary' %}{{ mac_executive_summary() }}
-    {% elif sec_id == 'risk_summary'      %}{{ mac_risk_summary() }}
-    {% elif sec_id == 'scope'             %}{{ mac_scope() }}
-    {% elif sec_id == 'vuln_details'      %}{{ mac_vuln_details() }}
-    {% elif sec_id == 'host_breakdown'    %}{{ mac_host_breakdown() }}
-    {% elif sec_id == 'remediation_plan'  %}{{ mac_remediation_plan() }}
-    {% elif sec_id == 'attack_timeline'   %}{{ mac_attack_timeline() }}
-    {% elif sec_id == 'ioc'               %}{{ mac_ioc() }}
-    {% elif sec_id == 'diff_retest'       %}{{ mac_diff_retest() }}
-    {% elif sec_id == 'risk_register'     %}{{ mac_risk_register() }}
-    {% elif sec_id == 'compliance_matrix' %}{{ mac_compliance_matrix() }}
-    {% elif sec_id == 'osint_findings'    %}{{ mac_osint_findings() }}
-    {% elif sec_id == 'recommendations'   %}{{ mac_recommendations() }}
-    {% elif sec_id == 'appendix'          %}{{ mac_appendix() }}
+    {% if   sec_id == 'toc'                   %}{{ mac_toc() }}
+    {% elif sec_id == 'doc_control'           %}{{ mac_doc_control() }}
+    {% elif sec_id == 'executive_summary'     %}{{ mac_executive_summary() }}
+    {% elif sec_id == 'findings_summary'      %}{{ mac_findings_summary() }}
+    {% elif sec_id == 'risk_summary'          %}{{ mac_risk_summary() }}
+    {% elif sec_id == 'scope'                 %}{{ mac_scope() }}
+    {% elif sec_id == 'engagement_overview'   %}{{ mac_engagement_overview() }}
+    {% elif sec_id == 'vuln_details'          %}{{ mac_vuln_details() }}
+    {% elif sec_id == 'host_breakdown'        %}{{ mac_host_breakdown() }}
+    {% elif sec_id == 'remediation_plan'      %}{{ mac_remediation_plan() }}
+    {% elif sec_id == 'attack_timeline'       %}{{ mac_attack_timeline() }}
+    {% elif sec_id == 'attack_narrative'      %}{{ mac_attack_narrative() }}
+    {% elif sec_id == 'attack_paths'          %}{{ mac_attack_paths() }}
+    {% elif sec_id == 'ioc'                   %}{{ mac_ioc() }}
+    {% elif sec_id == 'diff_retest'           %}{{ mac_diff_retest() }}
+    {% elif sec_id == 'risk_register'         %}{{ mac_risk_register() }}
+    {% elif sec_id == 'compliance_matrix'     %}{{ mac_compliance_matrix() }}
+    {% elif sec_id == 'osint_findings'        %}{{ mac_osint_findings() }}
+    {% elif sec_id == 'digital_footprint'     %}{{ mac_digital_footprint() }}
+    {% elif sec_id == 'credential_exposure'   %}{{ mac_credential_exposure() }}
+    {% elif sec_id == 'owasp_coverage'        %}{{ mac_owasp_coverage() }}
+    {% elif sec_id == 'masvs_coverage'        %}{{ mac_masvs_coverage() }}
+    {% elif sec_id == 'mitre_mapping'         %}{{ mac_mitre_mapping() }}
+    {% elif sec_id == 'detection_gap'         %}{{ mac_detection_gap() }}
+    {% elif sec_id == 'cloud_posture_overview'%}{{ mac_cloud_posture_overview() }}
+    {% elif sec_id == 'network_overview'      %}{{ mac_network_overview() }}
+    {% elif sec_id == 'recommendations'       %}{{ mac_recommendations() }}
+    {% elif sec_id == 'appendix'              %}{{ mac_appendix() }}
     {% endif %}
   {% endfor %}
 

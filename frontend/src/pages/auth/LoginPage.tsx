@@ -13,7 +13,7 @@ import { apiClient } from "@/api/client";
 import { useAuthStore } from "@/store/authStore";
 
 const loginSchema = z.object({
-  email: z.string().email("Enter a valid email address"),
+  identifier: z.string().min(1, "Username or email is required"),
   password: z.string().min(1, "Password is required"),
 });
 
@@ -101,21 +101,21 @@ export default function LoginPage() {
             </div>
           )}
 
-          {/* Email */}
+          {/* Identifier */}
           <div>
-            <label htmlFor="email" className="label">
-              Email address
+            <label htmlFor="identifier" className="label">
+              Username or email
             </label>
             <input
-              {...register("email")}
-              id="email"
-              type="email"
-              autoComplete="email"
+              {...register("identifier")}
+              id="identifier"
+              type="text"
+              autoComplete="username"
               className="input"
-              placeholder="you@company.com"
+              placeholder="admin or you@company.com"
             />
-            {errors.email && (
-              <p className="mt-1 text-xs text-red-400">{errors.email.message}</p>
+            {errors.identifier && (
+              <p className="mt-1 text-xs text-red-400">{errors.identifier.message}</p>
             )}
           </div>
 

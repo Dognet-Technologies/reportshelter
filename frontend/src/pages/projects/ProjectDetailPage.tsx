@@ -182,8 +182,6 @@ const settingsSchema = z.object({
   primary_color: z.string().optional(),
   secondary_color: z.string().optional(),
   watermark_text: z.string().optional(),
-  header_left: z.string().optional(),
-  header_center: z.string().optional(),
   footer_text: z.string().optional(),
 });
 
@@ -210,8 +208,7 @@ export default function ProjectDetailPage() {
   const updateProject = useUpdateProject(projectId);
   const deleteSubProject = useDeleteSubProject(projectId);
 
-  const heartbeatInterval = useRef<ReturnType<typeof setInterval> | null>(null);
-  const hasLock = useRef(false);
+const hasLock = useRef(false);
 
   // Determine if locked by someone else (we tried to acquire but couldn't)
   const currentLock = project?.lock;
@@ -220,15 +217,21 @@ export default function ProjectDetailPage() {
     !currentLock.is_expired &&
     !hasLock.current;
 
-  // Acquire lock on mount, release on unmount
+  // Acquire lock on mount, release on unmount.
+  // `active` flag guards against the React 18 Strict Mode double-invoke:
+  // if cleanup fires before the async acquire resolves, we skip the interval
+  // creation so no orphaned timer survives component unmount.
   useEffect(() => {
     if (!projectId) return;
+    let active = true;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
 
     async function acquireLockAndStartHeartbeat() {
       try {
         await acquire.mutateAsync();
+        if (!active) return;
         hasLock.current = true;
-        heartbeatInterval.current = setInterval(() => {
+        intervalId = setInterval(() => {
           heartbeat.mutate();
         }, 60_000);
       } catch {
@@ -239,9 +242,8 @@ export default function ProjectDetailPage() {
     acquireLockAndStartHeartbeat();
 
     return () => {
-      if (heartbeatInterval.current) {
-        clearInterval(heartbeatInterval.current);
-      }
+      active = false;
+      if (intervalId) clearInterval(intervalId);
       if (hasLock.current) {
         release.mutate();
         hasLock.current = false;
@@ -269,8 +271,6 @@ export default function ProjectDetailPage() {
           primary_color: project.primary_color,
           secondary_color: project.secondary_color,
           watermark_text: project.watermark_text,
-          header_left: project.header_left,
-          header_center: project.header_center,
           footer_text: project.footer_text,
         }
       : undefined,
@@ -372,10 +372,6 @@ export default function ProjectDetailPage() {
           <button onClick={() => setShowInvite(true)} className="btn-secondary">
             <Users className="h-4 w-4" />
             Invite
-          </button>
-          <button onClick={() => setShowCreateSp(true)} className="btn-primary">
-            <Plus className="h-4 w-4" />
-            Add Scan
           </button>
         </div>
       </div>
@@ -653,16 +649,6 @@ export default function ProjectDetailPage() {
             <div>
               <label className="label">Watermark text</label>
               <input {...register("watermark_text")} className="input" placeholder="CONFIDENTIAL" />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="label">Header left</label>
-                <input {...register("header_left")} className="input" placeholder="Company logo area" />
-              </div>
-              <div>
-                <label className="label">Header center</label>
-                <input {...register("header_center")} className="input" placeholder="Report title" />
-              </div>
             </div>
             <div>
               <label className="label">Footer text</label>

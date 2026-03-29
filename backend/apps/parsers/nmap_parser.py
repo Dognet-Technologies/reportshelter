@@ -103,12 +103,12 @@ def _open_port_findings(hosts) -> list[NormalizedVulnerability]:
                     + "."
                 ),
                 affected_host=display_host,
-                affected_port=str(port),
+                affected_port=port,              # int
                 affected_service=service_name,
                 risk_level=_port_risk(port),
                 evidence_code=evidence[:8192],
                 source="nmap",
-                raw_output="",
+                raw_output=evidence[:2048],
             ))
 
     return findings
@@ -127,8 +127,18 @@ class NmapParser(BaseParser):
 
     def parse(self, file_obj: IO[bytes]) -> list[NormalizedVulnerability]:
         from cyberreport_pro_parsers.parsers.nmap_parser import NmapParser as NewNmapParser
+        import xml.etree.ElementTree as ET
 
         data = file_obj.read()
+
+        # Validate XML and root tag before delegating to Layer 2
+        try:
+            root = ET.fromstring(data)
+        except ET.ParseError as exc:
+            raise ParserError(f"Invalid Nmap XML: {exc}") from exc
+        if root.tag != "nmaprun":
+            raise ParserError(f"Not a valid Nmap XML export (expected root tag 'nmaprun', got '{root.tag}').")
+
         try:
             parser = NewNmapParser(data)
             parser.parse()

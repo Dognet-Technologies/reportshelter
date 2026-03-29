@@ -61,7 +61,7 @@ class RegisterSerializer(serializers.Serializer):
     """User + Organization registration in one step."""
 
     # Organization fields
-    organization_name = serializers.CharField(max_length=255)
+    org_name = serializers.CharField(max_length=255)
 
     # User fields
     email = serializers.EmailField()
@@ -86,7 +86,7 @@ class RegisterSerializer(serializers.Serializer):
 
         from django.utils.text import slugify
 
-        org_name = validated_data.pop("organization_name")
+        org_name = validated_data.pop("org_name")
         slug = slugify(org_name)
         if Organization.objects.filter(slug=slug).exists():
             slug = f"{slug}-{uuid.uuid4().hex[:6]}"
@@ -105,9 +105,9 @@ class RegisterSerializer(serializers.Serializer):
 
 
 class LoginSerializer(serializers.Serializer):
-    """Email + password login."""
+    """Username or email + password login."""
 
-    email = serializers.EmailField()
+    identifier = serializers.CharField()
     password = serializers.CharField(write_only=True)
 
 

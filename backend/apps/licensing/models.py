@@ -71,6 +71,9 @@ class License(models.Model):
         default=LicenseStatus.TRIAL_ACTIVE,
     )
     license_key = models.CharField(max_length=255, blank=True, default="")
+    # Opaque token returned by the DLM /activate endpoint.
+    # Used for all subsequent /validate and /deactivate calls.
+    activation_token = models.CharField(max_length=255, blank=True, default="")
 
     trial_started_at  = models.DateTimeField(null=True, blank=True)
     trial_expires_at  = models.DateTimeField(null=True, blank=True)
@@ -215,8 +218,15 @@ class License(models.Model):
             )
             return self._grace_period_status(now, fallback)
 
+        if not self.activation_token:
+            logger.warning(
+                "No activation token for org %s — skipping online validation.",
+                self.organization_id,
+            )
+            return fallback
+
         try:
-            info = client.validate_license(self.license_key)
+            info = client.validate_license(self.activation_token)
         except (WPLicenseClientError, Exception) as exc:
             logger.warning(
                 "Online license check failed for org %s: %s",
@@ -301,15 +311,18 @@ class License(models.Model):
     def activate_pro(
         self,
         license_key: str,
+        activation_token: str = "",
         expires_at: "timezone.datetime | None" = None,  # type: ignore[name-defined]
     ) -> None:
         """
         Transition to PRO_ACTIVE after the DLM API confirms the key.
+        Stores the activation token for future validate/deactivate calls.
         Records an immediate online check timestamp so the next check
         is deferred by ``_ONLINE_CHECK_INTERVAL_H`` hours.
         """
         now = timezone.now()
         self.license_key = license_key
+        self.activation_token = activation_token
         self.status = LicenseStatus.PRO_ACTIVE
         self.pro_activated_at = now
         self.pro_expires_at = expires_at

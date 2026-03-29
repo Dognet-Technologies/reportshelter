@@ -42,9 +42,11 @@ class NormalizedVulnerability:
     description: str = ""
     remediation: str = ""
     affected_host: str = ""
-    affected_port: str = ""
+    affected_ip: str = ""
+    affected_port: int | None = None
     affected_service: str = ""
-    cve_id: str = ""
+    affected_protocol: str = "tcp"
+    cve_id: list[str] = field(default_factory=list)
     cvss_score: float | None = None
     cvss_vector: str = ""
     epss_score: float | None = None
@@ -52,6 +54,12 @@ class NormalizedVulnerability:
     evidence_code: str = ""
     source: str = ""  # tool name
     raw_output: str = ""
+    nvd_enrichment_status: str = "pending"
+    # Chart-support fields (set by parsers when available; derived by generator otherwise)
+    category: str = ""          # CWE-ID, OWASP category, MASVS control, etc.
+    likelihood: int | None = None   # 1-5
+    impact: int | None = None       # 1-5
+    effort_level: str = ""      # low / medium / high
 
 
 @dataclass
@@ -88,11 +96,9 @@ def deduplicate_and_save(
         }
 
         for norm in normalized_vulns:
-            key = (
-                norm.title.lower().strip(),
-                norm.affected_host.lower().strip(),
-                norm.affected_port.strip(),
-            )
+            host = (norm.affected_ip or norm.affected_host).lower().strip()
+            port = str(norm.affected_port) if norm.affected_port else ""
+            key = (norm.title.lower().strip(), host, port)
 
             if key in existing:
                 vuln = existing[key]
@@ -102,6 +108,12 @@ def deduplicate_and_save(
                 # Append raw output
                 if norm.raw_output:
                     vuln.raw_outputs.append(norm.raw_output)
+                # Merge CVE lists (union, dedup)
+                existing_cves = set(vuln.cve_id or [])
+                new_cves = set(norm.cve_id or [])
+                merged = sorted(existing_cves | new_cves)
+                if merged != sorted(existing_cves):
+                    vuln.cve_id = merged
                 # Update CVSS/EPSS if not already set
                 if vuln.cvss_score is None and norm.cvss_score is not None:
                     vuln.cvss_score = norm.cvss_score
@@ -117,15 +129,21 @@ def deduplicate_and_save(
                     title=norm.title,
                     description=norm.description,
                     remediation=norm.remediation,
+                    affected_ip=norm.affected_ip,
                     affected_host=norm.affected_host,
                     affected_port=norm.affected_port,
                     affected_service=norm.affected_service,
-                    cve_id=norm.cve_id,
+                    cve_id=list(norm.cve_id) if norm.cve_id else [],
                     cvss_score=norm.cvss_score,
                     cvss_vector=norm.cvss_vector,
                     epss_score=norm.epss_score,
                     risk_level=norm.risk_level,
                     evidence_code=norm.evidence_code,
+                    nvd_enrichment_status=norm.nvd_enrichment_status,
+                    category=norm.category,
+                    likelihood=norm.likelihood,
+                    impact=norm.impact,
+                    effort_level=norm.effort_level,
                     sources=[norm.source] if norm.source else [],
                     raw_outputs=[norm.raw_output] if norm.raw_output else [],
                 )

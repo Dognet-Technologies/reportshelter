@@ -166,9 +166,24 @@ class LoginView(APIView):
         serializer = LoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        email = serializer.validated_data["email"].lower()
+        identifier = serializer.validated_data["identifier"].strip()
         password = serializer.validated_data["password"]
         ip = _get_client_ip(request)
+
+        # Resolve identifier to an email address.
+        # If the identifier looks like an email, use it directly.
+        # Otherwise treat it as a username prefix (e.g. "admin" → "admin@localhost").
+        if "@" in identifier:
+            email = identifier.lower()
+        else:
+            try:
+                email = User.objects.get(
+                    email__startswith=f"{identifier.lower()}@"
+                ).email
+            except User.DoesNotExist:
+                email = identifier.lower()
+            except User.MultipleObjectsReturned:
+                email = identifier.lower()
 
         if _is_locked_out(email):
             return Response(
@@ -393,6 +408,24 @@ class OrganizationView(generics.RetrieveUpdateAPIView):
     def get_object(self) -> Organization:
         return self.request.user.organization
 
+    def partial_update(self, request, *args, **kwargs):
+        # request.data for multipart is a Django QueryDict (subclass of MultiValueDict).
+        # Spreading it with {**qd} reads raw internal dict values which are LISTS,
+        # causing "Not a valid string." on every field.
+        # .dict() correctly returns {key: last_value} as flat strings.
+        # Files are in request.FILES and must be merged separately.
+        if hasattr(request.data, "dict"):
+            data: dict = request.data.dict()
+        else:
+            data = dict(request.data)
+        for key, uploaded_file in request.FILES.items():
+            data[key] = uploaded_file
+
+        serializer = self.get_serializer(self.get_object(), data=data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(serializer.data)
+
 
 # ---------------------------------------------------------------------------
 # User management & invites
@@ -437,28 +470,12 @@ class InviteUserView(APIView):
 
         user = User.objects.create_user(
             email=email,
-            password=User.objects.make_random_password(length=40),
+            password=None,
             organization=request.user.organization,
             first_name=data.get("first_name", ""),
             last_name=data.get("last_name", ""),
             role=data["role"],
-        )
-
-        # Send password set email (reuse reset flow)
-        token = PasswordResetToken.create_for_user(user)
-        frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173")
-        setup_url = f"{frontend_url}/set-password?token={token.token}"
-        send_mail(
-            subject=f"You've been invited to {request.user.organization.name} on CyberReport Pro",
-            message=(
-                f"Hi {user.first_name or email},\n\n"
-                f"You have been invited by {request.user.full_name}.\n"
-                f"Set your password here: {setup_url}\n\n"
-                "This link expires in 1 hour."
-            ),
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[email],
-            fail_silently=True,
+            must_change_password=True,
         )
 
         AuditLog.log(

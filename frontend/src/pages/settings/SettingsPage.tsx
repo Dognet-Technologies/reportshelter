@@ -309,8 +309,6 @@ const orgSchema = z.object({
   website: z.string().url("Enter a valid URL").optional().or(z.literal("")),
   phone: z.string().optional(),
   legal_disclaimer: z.string().optional(),
-  primary_color: z.string().optional(),
-  secondary_color: z.string().optional(),
 });
 
 type OrgFormData = z.infer<typeof orgSchema>;
@@ -349,27 +347,29 @@ function OrganizationSection() {
           website: org.website,
           phone: org.phone,
           legal_disclaimer: org.legal_disclaimer,
-          primary_color: org.primary_color,
-          secondary_color: org.secondary_color,
         }
       : undefined,
   });
 
   async function onSubmit(data: OrgFormData) {
     try {
+      let result;
       if (logoFile) {
         const formData = new FormData();
         Object.entries(data).forEach(([k, v]) => {
           if (v !== undefined && v !== null) formData.append(k, v);
         });
         formData.append("logo", logoFile);
-        await updateOrg.mutateAsync(formData);
+        result = await updateOrg.mutateAsync(formData);
       } else {
-        await updateOrg.mutateAsync(data);
+        result = await updateOrg.mutateAsync(data);
       }
       toast.success("Organization settings saved.");
       reset(data);
       setLogoFile(null);
+      // Use the URL returned by the server so the preview stays visible
+      // immediately, without relying on the React Query cache timing.
+      setLogoPreview(result.logo ?? null);
     } catch {
       toast.error("Failed to save organization settings.");
     }
@@ -464,45 +464,6 @@ function OrganizationSection() {
           <p className="mt-1 text-xs text-slate-500">
             This text appears in the footer of all generated reports.
           </p>
-        </div>
-      </div>
-
-      <div className="card space-y-4">
-        <h3 className="font-semibold text-slate-100">Report Branding Colors</h3>
-        <p className="text-xs text-slate-500">
-          These are the default colors for new projects. Each project can override them individually.
-        </p>
-        <div className="grid grid-cols-2 gap-6">
-          <div>
-            <label className="label">Primary color</label>
-            <div className="flex items-center gap-3">
-              <input
-                {...register("primary_color")}
-                type="color"
-                className="h-10 w-16 rounded border border-slate-700 bg-slate-800 p-1 cursor-pointer"
-              />
-              <input
-                {...register("primary_color")}
-                className="input flex-1 font-mono text-xs"
-                placeholder="#2563eb"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="label">Secondary color</label>
-            <div className="flex items-center gap-3">
-              <input
-                {...register("secondary_color")}
-                type="color"
-                className="h-10 w-16 rounded border border-slate-700 bg-slate-800 p-1 cursor-pointer"
-              />
-              <input
-                {...register("secondary_color")}
-                className="input flex-1 font-mono text-xs"
-                placeholder="#64748b"
-              />
-            </div>
-          </div>
         </div>
       </div>
 

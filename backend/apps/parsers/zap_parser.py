@@ -54,7 +54,12 @@ class ZAPParser(BaseParser):
 
         for site in root.findall(".//site"):
             host = site.get("host", "")
-            port = site.get("port", "80")
+            port_raw = site.get("port", "80")
+            port_int: int | None = None
+            try:
+                port_int = int(port_raw)
+            except (ValueError, TypeError):
+                pass
 
             for alert in site.findall(".//alertitem"):
                 name = alert.findtext("alert", "").strip()
@@ -67,7 +72,7 @@ class ZAPParser(BaseParser):
                 evidence = alert.findtext("evidence", "").strip()
                 reference = alert.findtext("reference", "").strip()
 
-                cve_id = self._extract_cve(desc + " " + reference)
+                cve_str = self._extract_cve(desc + " " + reference)
                 risk_level = self.RISK_MAP.get(risk_code, "info")
 
                 evidence_text = ""
@@ -88,9 +93,9 @@ class ZAPParser(BaseParser):
                     description=desc,
                     remediation=solution,
                     affected_host=host,
-                    affected_port=port,
+                    affected_port=port_int,
                     affected_service="http",
-                    cve_id=cve_id,
+                    cve_id=[cve_str] if cve_str else [],
                     risk_level=risk_level,
                     evidence_code=evidence_text[:4096],
                     source=self.tool_name,
@@ -114,7 +119,12 @@ class ZAPParser(BaseParser):
 
         for site in sites:
             host = site.get("@host", "")
-            port = str(site.get("@port", "80"))
+            port_val = site.get("@port", 80)
+            port_int: int | None = None
+            try:
+                port_int = int(port_val)
+            except (ValueError, TypeError):
+                pass
             alerts = site.get("alerts", [])
 
             for alert in alerts:
@@ -127,7 +137,7 @@ class ZAPParser(BaseParser):
                 reference = alert.get("reference", "").strip()
                 cwe_id = str(alert.get("cweid", ""))
 
-                cve_id = self._extract_cve(desc + " " + reference)
+                cve_str = self._extract_cve(desc + " " + reference)
                 risk_level = self.RISK_MAP.get(risk_code, "info")
 
                 evidence_text = ""
@@ -148,9 +158,9 @@ class ZAPParser(BaseParser):
                     description=desc,
                     remediation=solution,
                     affected_host=host,
-                    affected_port=port,
+                    affected_port=port_int,
                     affected_service="http",
-                    cve_id=cve_id,
+                    cve_id=[cve_str] if cve_str else [],
                     risk_level=risk_level,
                     evidence_code=evidence_text[:4096],
                     source=self.tool_name,

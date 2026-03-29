@@ -135,7 +135,7 @@ def enrich_vulnerabilities_with_nvd(self, vulnerability_ids: list[int]) -> dict:
 
     from apps.vulnerabilities.models import Vulnerability
 
-    vulns = list(Vulnerability.objects.filter(pk__in=vulnerability_ids, cve_id__gt=""))
+    vulns = list(Vulnerability.objects.filter(pk__in=vulnerability_ids, cve_id__len__gt=0))
     if not vulns:
         return {"enriched": 0}
 
@@ -145,8 +145,9 @@ def enrich_vulnerabilities_with_nvd(self, vulnerability_ids: list[int]) -> dict:
     # Build map: cve_id → [Vulnerability, ...]
     unique_cves: dict[str, list[Vulnerability]] = {}
     for v in vulns:
-        for cve in [c.strip() for c in v.cve_id.split(",") if c.strip()]:
-            unique_cves.setdefault(cve, []).append(v)
+        for cve in (v.cve_id or []):
+            if cve and cve.strip():
+                unique_cves.setdefault(cve.strip(), []).append(v)
 
     # ── Step 1: CVSS from NVD ──────────────────────────────────────────────────
     cvss_map: dict[str, tuple[float, str]] = {}   # cve_id → (score, vector)

@@ -679,38 +679,168 @@ class NessusCsvParser(BaseParser):
 # Auto-detect parser
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# FORMAT 4 — OpenVAS Excel Parser (.xlsx)
+# ---------------------------------------------------------------------------
+
+class OpenVasExcelParser(BaseParser):
+    """
+    Parser per OpenVAS/Greenbone Excel export (.xlsx).
+
+    Il formato Excel di OpenVAS è strutturalmente identico al CSV:
+    stesse colonne, stesso significato, stessa pipeline di parsing.
+    Questo parser legge il foglio Sheet1 con openpyxl,
+    converte ogni riga in un dict compatibile con OpenVasCsvParser._parse_row(),
+    e delega la logica di normalizzazione a quest'ultimo.
+
+    Dipendenza: openpyxl (aggiungere a requirements.txt)
+
+    Sicurezza:
+    - Validazione magic bytes prima di aprire con openpyxl (OWASP: file upload validation)
+    - Limite righe (MAX_ROWS = 50_000) per prevenire DoS su file enormi
+    - Nessuna esecuzione di macro/formula (data_only=True)
+    """
+
+    SOURCE_TOOL = "openvas"
+    MAX_ROWS = 50_000
+    # Magic bytes XLSX: PK\x03\x04 (ZIP container)
+    XLSX_MAGIC = b'PK\x03\x04'
+
+    def parse(self, source: bytes | str | Path) -> ScanImportResult:
+        if isinstance(source, Path):
+            source = source.read_bytes()
+        if isinstance(source, str):
+            raise ValueError("OpenVasExcelParser richiede bytes, non str.")
+
+        # Validazione magic bytes (OWASP: non fidarsi dell'estensione)
+        if not source[:4] == self.XLSX_MAGIC:
+            raise ValueError("File non riconosciuto come XLSX (magic bytes errati).")
+
+        try:
+            import openpyxl
+        except ImportError:
+            raise ValueError(
+                "openpyxl non installato. Aggiungere 'openpyxl' a requirements.txt."
+            )
+
+        import io as _io
+
+        try:
+            # data_only=True: ignora formule, legge solo valori calcolati
+            # read_only=True: streaming mode, efficiente su file grandi
+            wb = openpyxl.load_workbook(
+                _io.BytesIO(source),
+                read_only=True,
+                data_only=True,
+            )
+        except Exception as exc:
+            raise ValueError(f"Impossibile aprire file XLSX: {exc}") from exc
+
+        # OpenVAS esporta sempre su Sheet1
+        sheet_name = wb.sheetnames[0] if wb.sheetnames else None
+        if not sheet_name:
+            raise ValueError("File XLSX vuoto: nessun foglio trovato.")
+
+        ws = wb[sheet_name]
+
+        # Estrai righe come lista di tuple
+        rows = list(ws.iter_rows(max_row=self.MAX_ROWS + 1, values_only=True))
+        wb.close()
+
+        if not rows:
+            raise ValueError("Foglio Excel vuoto.")
+
+        # Prima riga = header
+        header = [str(cell).strip() if cell is not None else "" for cell in rows[0]]
+
+        if len(rows) > self.MAX_ROWS + 1:
+            logger.warning(
+                "[openvas_excel] File con più di %d righe — troncato per sicurezza.",
+                self.MAX_ROWS,
+            )
+
+        # Converti righe in dict compatibili con OpenVasCsvParser._parse_row()
+        csv_parser = OpenVasCsvParser()
+        result = ScanImportResult(source_tool=self.SOURCE_TOOL)
+        hosts_map: dict[str, NormalizedHost] = {}
+
+        for row_num, row in enumerate(rows[1:self.MAX_ROWS + 1], start=2):
+            try:
+                # Costruisci dict {header: valore} normalizzando i tipi
+                row_dict = {}
+                for col_name, cell_val in zip(header, row):
+                    if cell_val is None:
+                        row_dict[col_name] = ""
+                    elif isinstance(cell_val, (int, float)):
+                        row_dict[col_name] = str(cell_val)
+                    else:
+                        row_dict[col_name] = str(cell_val).strip()
+
+                vuln = csv_parser._parse_row(row_dict)
+                if vuln is None:
+                    continue
+
+                result.vulnerabilities.append(vuln)
+
+                ip_key = vuln.affected_ip or vuln.affected_host
+                if ip_key and ip_key not in hosts_map:
+                    hosts_map[ip_key] = NormalizedHost(
+                        ip_address=vuln.affected_ip,
+                        hostname=vuln.affected_host,
+                        source_tool=self.SOURCE_TOOL,
+                    )
+            except Exception as exc:
+                result.parse_errors.append(f"Row {row_num}: {exc}")
+                logger.warning("[openvas_excel] Row %d error: %s", row_num, exc)
+
+        result.hosts = list(hosts_map.values())
+        return result
+
+
+# ---------------------------------------------------------------------------
+# Auto-detect parser
+# ---------------------------------------------------------------------------
+
 def detect_and_parse(source: bytes | str | Path) -> ScanImportResult:
     """
     Rileva automaticamente il formato e usa il parser corretto.
     Ordine di detection:
-      1. Se bytes/str contiene <report ... format_id="a994b278..."> → OpenVAS XML
-      2. Se CSV con header 'IP,Hostname,Port,Port Protocol' → OpenVAS CSV
-      3. Se CSV con header 'Plugin ID,CVE,CVSS v2.0 Base Score' → Nessus CSV
+      1. Magic bytes PK\\x03\\x04 → XLSX → OpenVasExcelParser
+      2. Primo byte '<' → XML → OpenVasXmlParser
+      3. Header CSV con 'NVT Name'/'NVT OID' → OpenVasCsvParser
+      4. Header CSV con 'CVSS v2.0 Base Score'/'Risk' → NessusCsvParser
     """
     if isinstance(source, Path):
         raw = source.read_bytes()
-        source_bytes = raw
     elif isinstance(source, str):
-        source_bytes = source.encode('utf-8')
-        raw = source_bytes
+        raw = source.encode('utf-8')
     else:
-        source_bytes = source
         raw = source
 
-    # Prova XML
-    if raw.lstrip()[:1] == b'<':
-        return OpenVasXmlParser().parse(source_bytes)
+    # 1. XLSX detection (magic bytes)
+    if raw[:4] == b'PK\x03\x04':
+        logger.info("[detect_and_parse] Detected XLSX format.")
+        return OpenVasExcelParser().parse(raw)
 
-    # CSV detection
+    # 2. XML detection
+    if raw.lstrip()[:1] == b'<':
+        logger.info("[detect_and_parse] Detected XML format.")
+        return OpenVasXmlParser().parse(raw)
+
+    # 3. CSV detection
     try:
         text = raw.decode('utf-8', errors='replace')
         first_line = text.split('\n')[0]
-        # Nessus: ha 'CVSS v2.0 Base Score' e 'Risk Factor' (con o senza Plugin ID)
         if 'CVSS v2.0 Base Score' in first_line and 'Risk' in first_line:
+            logger.info("[detect_and_parse] Detected Nessus CSV format.")
             return NessusCsvParser().parse(text)
         if 'NVT Name' in first_line or ('IP' in first_line and 'NVT OID' in first_line):
+            logger.info("[detect_and_parse] Detected OpenVAS CSV format.")
             return OpenVasCsvParser().parse(text)
     except Exception:
         pass
 
-    raise ValueError("Formato non riconosciuto. Attesi: OpenVAS XML, OpenVAS CSV, Nessus CSV")
+    raise ValueError(
+        "Formato non riconosciuto. "
+        "Attesi: OpenVAS XLSX, OpenVAS XML, OpenVAS CSV, Nessus CSV."
+    )

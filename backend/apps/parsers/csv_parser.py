@@ -136,14 +136,27 @@ class CSVParser(BaseParser):
                 except ValueError:
                     pass
 
+            # Parse port to int
+            port_int: int | None = None
+            port_raw = mapped.get("affected_port", "")
+            if port_raw:
+                try:
+                    port_int = int(port_raw)
+                except (ValueError, TypeError):
+                    pass
+
+            # CVE: single string → list
+            cve_raw = mapped.get("cve_id", "").strip()
+            cve_ids = [cve_raw] if cve_raw else []
+
             results.append(NormalizedVulnerability(
                 title=title,
                 description=mapped.get("description", ""),
                 remediation=mapped.get("remediation", ""),
                 affected_host=mapped.get("affected_host", ""),
-                affected_port=mapped.get("affected_port", ""),
+                affected_port=port_int,
                 affected_service=mapped.get("affected_service", ""),
-                cve_id=mapped.get("cve_id", ""),
+                cve_id=cve_ids,
                 cvss_score=cvss_score,
                 epss_score=epss_score,
                 risk_level=risk_level,

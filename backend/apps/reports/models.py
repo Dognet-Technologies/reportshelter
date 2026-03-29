@@ -38,6 +38,12 @@ class ReportExport(models.Model):
         default=dict,
         help_text="Serialized report options (filters, template, etc.) used for this export.",
     )
+    report_name = models.CharField(
+        max_length=200,
+        blank=True,
+        default="",
+        help_text="Human-readable name set at generation time.",
+    )
 
     generated_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
