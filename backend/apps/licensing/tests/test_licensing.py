@@ -113,8 +113,7 @@ class TestLicenseAPI:
         url = reverse("licensing:status")
         resp = auth_client.get(url)
         assert resp.status_code == status.HTTP_200_OK
-        assert resp.data["success"] is True
-        assert resp.data["license"]["status"] == LicenseStatus.TRIAL_ACTIVE
+        assert resp.data["status"] == LicenseStatus.TRIAL_ACTIVE
 
     def test_status_requires_auth(self):
         client = APIClient()
@@ -122,11 +121,11 @@ class TestLicenseAPI:
         resp = client.get(url)
         assert resp.status_code == status.HTTP_401_UNAUTHORIZED
 
-    def test_activate_not_configured_returns_503(self, auth_client, trial_license):
+    def test_activate_invalid_key_rejected(self, auth_client, trial_license):
         url = reverse("licensing:activate")
-        resp = auth_client.post(url, {"license_key": "TESTKEY-1234-ABCD"}, format="json")
-        # WPLicenseClient raises NotImplementedError → 503
-        assert resp.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+        # WPLicenseClient is configured but remote will reject an unknown key → 400
+        resp = auth_client.post(url, {"license_key": "RS-TEST-1234-ABCD-EFGH"}, format="json")
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
 
     def test_activate_short_key_rejected(self, auth_client, trial_license):
         url = reverse("licensing:activate")
