@@ -1,0 +1,37 @@
+version: 2
+updates:
+  # Python / Django backend
+  - package-ecosystem: "pip"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    groups:
+      django:
+        patterns: ["django*", "djangorestframework*"]
+      celery:
+        patterns: ["celery*", "kombu*"]
+
+  # Node / React frontend
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    groups:
+      react:
+        patterns: ["react*", "@types/react*"]
+      vite:
+        patterns: ["vite*", "@vitejs/*"]
+      tanstack:
+        patterns: ["@tanstack/*"]
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 3
