@@ -5,6 +5,7 @@ Provides CRUD for Vulnerabilities, ScanImport upload, diff, and timeline endpoin
 
 from __future__ import annotations
 
+import logging
 import os
 
 from django.shortcuts import get_object_or_404
@@ -22,11 +23,14 @@ from apps.projects.models import SubProject
 from .deduplication import build_timeline, compute_diff
 from .models import ScanImport, Vulnerability
 from .serializers import (
+    BulkStatusSerializer,
     ScanImportSerializer,
     ScanImportUploadSerializer,
     VulnerabilityListSerializer,
     VulnerabilitySerializer,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _get_user_ip(request: Request) -> str | None:
@@ -275,6 +279,35 @@ class ScanImportRetryView(APIView):
 
         logger.info("ScanImport %s re-queued by %s.", pk, request.user.email)
         return Response(ScanImportSerializer(scan_import).data)
+
+
+class BulkStatusUpdateView(APIView):
+    """
+    PATCH /api/v1/vulnerabilities/bulk-status/
+    Update vuln_status for multiple vulnerabilities in one request.
+    Only vulnerabilities owned by the user's organisation are affected.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def patch(self, request: Request) -> Response:
+        serializer = BulkStatusSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        ids: list[int] = serializer.validated_data["ids"]
+        new_status: str = serializer.validated_data["vuln_status"]
+
+        # IDOR: restrict to the caller's organisation
+        qs = Vulnerability.objects.filter(
+            id__in=ids,
+            subproject__project__organization=request.user.organization,
+        )
+        updated = qs.update(vuln_status=new_status)
+
+        logger.info(
+            "Bulk status update: user=%s updated=%d/%d → %s",
+            request.user.email, updated, len(ids), new_status,
+        )
+        return Response({"updated": updated})
 
 
 class VulnerabilityDiffView(APIView):

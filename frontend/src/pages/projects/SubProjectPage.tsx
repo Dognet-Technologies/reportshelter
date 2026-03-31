@@ -8,7 +8,7 @@
  *   4. Active config panel (full-width, collapsible)
  *   5. Main grid: vulnerability table (left) + exports + screenshots (right)
  */
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useDropzone } from "react-dropzone";
 import {
@@ -21,7 +21,7 @@ import toast from "react-hot-toast";
 import {
   useSubProject, useVulnerabilities, useUploadScan, useScanImports,
   useReportExports, useScreenshots, useUploadScreenshot, useLicenseStatus,
-  useRetryScanImport, useCancelScanImport,
+  useRetryScanImport, useCancelScanImport, useBulkUpdateStatus,
 } from "@/api/hooks";
 import { downloadReport } from "@/api/download";
 import { useQueryClient } from "@tanstack/react-query";
@@ -618,6 +618,21 @@ export default function SubProjectPage() {
   const [extra,          setExtra]          = useState<ExtraConfig>(DEFAULT_EXTRA);
   const [selectedScanIds,setSelectedScanIds]= useState<Set<number>>(new Set());
 
+  const bulkUpdateStatus = useBulkUpdateStatus();
+
+  // Vulnerabilities whose scan import is deselected — greyed out in the table
+  // and excluded from report generation. Manually-created vulns (scan_import=null
+  // or undefined) are never disabled.
+  // Uses loose != null to also guard against undefined (API field not yet returned).
+  const disabledVulnIds = useMemo(() => {
+    if (selectedScanIds.size === 0) return new Set<number>();
+    return new Set(
+      (vulnerabilities ?? [])
+        .filter((v) => v.scan_import != null && !selectedScanIds.has(v.scan_import))
+        .map((v) => v.id),
+    );
+  }, [vulnerabilities, selectedScanIds]);
+
   const RISK_LEVELS: RiskLevel[]  = ["critical","high","medium","low","info"];
   const STATUSES:    VulnStatus[] = ["open","fixed","accepted","retest"];
 
@@ -659,7 +674,7 @@ export default function SubProjectPage() {
         </div>
         <Link
           to={`/projects/${pId}/reports/builder/${spId}`}
-          state={{ reportType, audience, style, extra }}
+          state={{ reportType, audience, style, extra, scan_import_ids: [...selectedScanIds] }}
           className="btn-primary shrink-0"
         >
           <FileText className="h-4 w-4" />Generate Report
@@ -721,7 +736,14 @@ export default function SubProjectPage() {
                 </select>
               </div>
             </div>
-            <VulnerabilityTable vulnerabilities={vulnerabilities ?? []} loading={vulnLoading} />
+            <VulnerabilityTable
+              vulnerabilities={vulnerabilities ?? []}
+              loading={vulnLoading}
+              disabledIds={disabledVulnIds}
+              onBulkStatusChange={(ids, newStatus) =>
+                bulkUpdateStatus.mutate({ ids, vuln_status: newStatus })
+              }
+            />
           </div>
         </div>
 
@@ -731,7 +753,7 @@ export default function SubProjectPage() {
           <div className="card">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold text-slate-100 flex items-center gap-2 text-sm"><FileText className="h-4 w-4" />Exports</h3>
-              <Link to={`/projects/${pId}/reports/builder/${spId}`} state={{ reportType, audience, style, extra }} className="btn-primary text-xs py-1.5"><Plus className="h-3.5 w-3.5" />Generate</Link>
+              <Link to={`/projects/${pId}/reports/builder/${spId}`} state={{ reportType, audience, style, extra, scan_import_ids: [...selectedScanIds] }} className="btn-primary text-xs py-1.5"><Plus className="h-3.5 w-3.5" />Generate</Link>
             </div>
             {!exports?.length ? (
               <p className="text-slate-500 text-sm text-center py-3">No reports yet.</p>

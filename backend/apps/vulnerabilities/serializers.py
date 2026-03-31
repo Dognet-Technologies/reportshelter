@@ -78,7 +78,23 @@ class VulnerabilityListSerializer(serializers.ModelSerializer):
             "cve_id",
             "is_recurring",
             "sources",
+            "scan_import",
         ]
+
+
+class BulkStatusSerializer(serializers.Serializer):
+    """Serializer for bulk vulnerability status updates."""
+
+    ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1),
+        min_length=1,
+        max_length=500,
+        help_text="List of vulnerability IDs to update.",
+    )
+    vuln_status = serializers.ChoiceField(
+        choices=Vulnerability.VulnStatus.choices,
+        help_text="New status to apply to all selected vulnerabilities.",
+    )
 
 
 class ScanImportSerializer(serializers.ModelSerializer):

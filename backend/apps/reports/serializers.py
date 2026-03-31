@@ -111,6 +111,13 @@ class ReportGenerateSerializer(serializers.Serializer):
         ),
     )
 
+    # Scan import filter — only vulnerabilities from these imports are included.
+    scan_import_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1),
+        required=False,
+        help_text="If provided, only include vulnerabilities from these scan import IDs.",
+    )
+
     # Chart configuration (from SubProjectPage ChartsPanel)
     charts_enabled = serializers.DictField(
         child=serializers.BooleanField(),

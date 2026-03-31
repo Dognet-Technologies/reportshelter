@@ -11,6 +11,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 from django.conf import settings
+from django.db import models
 from django.template.loader import render_to_string
 
 from apps.vulnerabilities.deduplication import build_timeline
@@ -207,6 +208,14 @@ class ReportGenerator:
         severity_filter = self.options.get("risk_levels")
         if severity_filter:
             qs = qs.filter(risk_level__in=severity_filter)
+
+        # Filter by scan import — only include vulns from selected imports.
+        # Manually-created vulns (scan_import=None) are always included.
+        scan_import_ids = self.options.get("scan_import_ids")
+        if scan_import_ids:
+            qs = qs.filter(
+                models.Q(scan_import__isnull=True) | models.Q(scan_import_id__in=scan_import_ids)
+            )
 
         from django.db.models import F
 

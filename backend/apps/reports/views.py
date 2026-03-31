@@ -79,6 +79,8 @@ class ReportGenerateView(APIView):
             options["charts_variants"] = data["charts_variants"]
         if data.get("charts_details"):
             options["charts_details"] = data["charts_details"]
+        if data.get("scan_import_ids"):
+            options["scan_import_ids"] = data["scan_import_ids"]
         if data.get("section_overrides"):
             # Sanitise: keep only entries whose value is a dict with a non-empty
             # 'custom_text' string, so the template never receives malformed data.

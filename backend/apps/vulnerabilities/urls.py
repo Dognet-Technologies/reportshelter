@@ -1,6 +1,7 @@
 from django.urls import path
 
 from .views import (
+    BulkStatusUpdateView,
     ProjectTimelineView,
     ScanImportCancelView,
     ScanImportDetailView,
@@ -16,6 +17,7 @@ app_name = "vulnerabilities"
 
 urlpatterns = [
     path("", VulnerabilityListCreateView.as_view(), name="vuln-list"),
+    path("bulk-status/", BulkStatusUpdateView.as_view(), name="vuln-bulk-status"),
     path("<int:pk>/", VulnerabilityDetailView.as_view(), name="vuln-detail"),
     path("import/<int:subproject_pk>/", ScanImportUploadView.as_view(), name="scan-import"),
     path("imports/", ScanImportListView.as_view(), name="scan-import-list"),

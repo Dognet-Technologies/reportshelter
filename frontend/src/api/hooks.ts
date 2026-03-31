@@ -362,6 +362,19 @@ export function useDeleteVulnerability() {
   });
 }
 
+export function useBulkUpdateStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { ids: number[]; vuln_status: VulnStatus }) =>
+      apiClient
+        .patch<{ updated: number }>("/vulnerabilities/bulk-status/", data)
+        .then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["vulnerabilities"] });
+    },
+  });
+}
+
 // ─── Diff & Timeline hooks ───────────────────────────────────────────────────
 
 export function useDiff(
@@ -536,6 +549,8 @@ export function useGenerateReport() {
       }>;
       /** Custom intro text per section, keyed by section ID. */
       section_overrides?: Record<string, { custom_text?: string }>;
+      /** Only include vulnerabilities from these scan import IDs. Manually-created vulns always included. */
+      scan_import_ids?: number[];
     }) =>
       apiClient.post<ReportExport>("/reports/generate/", data).then((r) => r.data),
     onSuccess: (report) => {

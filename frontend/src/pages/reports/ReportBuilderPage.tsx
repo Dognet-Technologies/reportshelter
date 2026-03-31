@@ -997,6 +997,8 @@ interface IncomingConfig {
   risk_levels?: string[];
   statuses?: VulnStatus[];
   section_overrides?: Record<string, { custom_text?: string }>;
+  /** IDs of selected scan imports — only vulns from these imports are included in the report. */
+  scan_import_ids?: number[];
 }
 
 /**
@@ -1125,10 +1127,17 @@ export default function ReportBuilderPage() {
 
   const enabledChartCount = Object.values(enabledCharts).filter(Boolean).length;
 
-  // Filter preview
-  const filteredVulns = (vulns ?? []).filter(
-    (v) => selectedRiskLevels.includes(v.risk_level) && selectedStatuses.includes(v.vuln_status)
-  );
+  // Filter preview — respects scan import selection from SubProjectPage.
+  // Manually-created vulns (scan_import === null) are always included.
+  const scanImportIds = incoming?.scan_import_ids;
+  const filteredVulns = (vulns ?? []).filter((v) => {
+    if (!selectedRiskLevels.includes(v.risk_level)) return false;
+    if (!selectedStatuses.includes(v.vuln_status)) return false;
+    if (scanImportIds && scanImportIds.length > 0 && v.scan_import !== null) {
+      return scanImportIds.includes(v.scan_import as number);
+    }
+    return true;
+  });
 
   const canGenerate = canExport && filteredVulns.length > 0 && enabledSections.size > 0;
 
@@ -1175,6 +1184,9 @@ export default function ReportBuilderPage() {
         ...(Object.keys(chartDetails).length > 0 ? { charts_details: chartDetails } : {}),
         ...(activeOverrides.length > 0
           ? { section_overrides: Object.fromEntries(activeOverrides) }
+          : {}),
+        ...(incoming?.scan_import_ids && incoming.scan_import_ids.length > 0
+          ? { scan_import_ids: incoming.scan_import_ids }
           : {}),
       });
       setGeneratedExportId(result.id);
