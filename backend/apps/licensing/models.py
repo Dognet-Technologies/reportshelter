@@ -183,7 +183,15 @@ class License(models.Model):
                 or (now - self.last_online_checked_at) >= interval
             )
             if needs_check:
-                new_status = self._validate_pro_online(now, new_status)
+                try:
+                    new_status = self._validate_pro_online(now, new_status)
+                except Exception:
+                    logger.exception(
+                        "Unexpected error during online license validation for org %s — "
+                        "applying grace period logic.",
+                        self.organization_id,
+                    )
+                    new_status = self._grace_period_status(now, new_status)
 
         if new_status != self.status:
             self.status = new_status

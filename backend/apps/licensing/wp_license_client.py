@@ -94,6 +94,13 @@ class WPLicenseClient:
         self._api_key    = _assemble(_K)
         self._api_secret = _assemble(_S)
 
+    @property
+    def _configured(self) -> bool:
+        """True when the client has a non-empty URL and credentials.
+        Since credentials are embedded, this is always True in production.
+        Returns False only if the API URL has been explicitly cleared via env."""
+        return bool(self._api_url and self._api_key and self._api_secret)
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
