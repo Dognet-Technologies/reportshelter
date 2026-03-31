@@ -166,7 +166,17 @@
     .vuln-meta        { font-size: 8.5pt; color: #6b7280; margin-bottom: 8px; }
     .vuln-meta span   { margin-right: 14px; }
 
-    /* Evidence styles */
+    /* Custom section intro text (user-authored via Report Builder) */
+    .section-custom-intro {
+      background: #f8fafc;
+      border-left: 3px solid {{ rpt_style.primary_color }};
+      padding: 8px 12px;
+      margin: 10px 0 14px;
+      font-size: 9.5pt;
+      color: #374151;
+      border-radius: 0 {{ rpt_style.border_radius_px }} {{ rpt_style.border_radius_px }} 0;
+    }
+
     .evidence-code {
       font-family: "Courier New", Courier, monospace;
       font-size: 8pt;
@@ -260,6 +270,17 @@
      user's drag-and-drop ordering is fully respected in the PDF.
      ================================================================ #}
 
+  {# ── Custom intro helper — renders user-authored text after section <h2> ── #}
+  {# section_overrides = {section_id: {custom_text: str}} from template context #}
+  {% macro _ci(sid) -%}
+    {%- set _overrides = section_overrides if section_overrides is defined else {} -%}
+    {%- set ov = _overrides.get(sid, {}) -%}
+    {%- set ct = ov.get('custom_text', '') if ov is mapping else '' -%}
+    {%- if ct -%}
+  <div class="section-custom-intro">{{ ct | nl2br }}</div>
+    {%- endif -%}
+  {%- endmacro %}
+
   {# ── Table of Contents ── #}
   {% macro mac_toc() %}
   <div class="page-break">
@@ -303,6 +324,7 @@
   {% macro mac_executive_summary() %}
   <div class="page-break">
     <h2>Executive Summary</h2>
+    {{ _ci('executive_summary') }}
     <p>
       This report presents the findings of the
       <strong>{{ report_type_label }}</strong> conducted on
@@ -362,6 +384,7 @@
   {% if 'executive_summary' not in sections %}
   <div class="page-break">
     <h2>Risk Summary</h2>
+    {{ _ci('risk_summary') }}
     <div class="kpi-row">
       <div class="kpi-box">
         <div class="kpi-number">{{ vulnerabilities|length }}</div>
@@ -411,6 +434,7 @@
   {% macro mac_scope() %}
   <div class="page-break">
     <h2>Scope &amp; Methodology</h2>
+    {{ _ci('scope') }}
     <h3>Scope</h3>
     {% if rpt_extra.scope %}
     <p>{{ rpt_extra.scope }}</p>
@@ -446,6 +470,7 @@
   {% macro mac_vuln_details() %}
   <div class="page-break">
     <h2>Vulnerability Overview</h2>
+    {{ _ci('vuln_details') }}
     {# Chart row for this section #}
     <div class="chart-grid">
       {% if charts.vulns_by_category %}
@@ -535,7 +560,7 @@
         <h3>Remediation</h3>
         <p>{{ v.remediation }}</p>
         {% endif %}
-        {% if audience == 'technical' and v.evidence_code %}
+        {% if v.evidence_code %}
         <h3>Evidence</h3>
         <div class="evidence-{{ rpt_style.evidence_style }}">{{ v.evidence_code[:2000] }}</div>
         {% endif %}
@@ -550,6 +575,7 @@
   {% if hosts %}
   <div class="page-break">
     <h2>Host Breakdown</h2>
+    {{ _ci('host_breakdown') }}
     {% for host_name, host_vulns in hosts.items() %}
     <div class="host-section">
       <div class="host-title">{{ host_name }} — {{ host_vulns|length }} finding{{ "s" if host_vulns|length != 1 else "" }}</div>
@@ -579,6 +605,7 @@
   {% macro mac_remediation_plan() %}
   <div class="page-break">
     <h2>Remediation Plan</h2>
+    {{ _ci('remediation_plan') }}
     <p>The following table summarizes recommended actions, ordered by priority.</p>
     {% if vulnerabilities %}
     <table class="rem-table">
@@ -610,6 +637,7 @@
   {% macro mac_attack_timeline() %}
   <div class="page-break">
     <h2>Attack Timeline</h2>
+    {{ _ci('attack_timeline') }}
     <p>Chronological narrative of attack steps and adversary activity during the engagement.</p>
     <p style="color:#6b7280;font-style:italic;">No timeline data recorded for this sub-project.</p>
   </div>
@@ -619,6 +647,7 @@
   {% macro mac_ioc() %}
   <div class="page-break">
     <h2>Indicators of Compromise</h2>
+    {{ _ci('ioc') }}
     <p>IoCs, TTPs, threat indicators, and file hashes identified during the engagement.</p>
     <p style="color:#6b7280;font-style:italic;">No IoC data recorded for this sub-project.</p>
   </div>
@@ -628,6 +657,7 @@
   {% macro mac_diff_retest() %}
   <div class="page-break">
     <h2>Retest Comparison</h2>
+    {{ _ci('diff_retest') }}
     <p>Comparison of current findings against the previous assessment.</p>
     <p style="color:#6b7280;font-style:italic;">No previous sub-project available for comparison.</p>
   </div>
@@ -637,6 +667,7 @@
   {% macro mac_risk_register() %}
   <div class="page-break">
     <h2>Risk Register</h2>
+    {{ _ci('risk_register') }}
     <p>Risk catalog with risk acceptance decisions.</p>
     <p style="color:#6b7280;font-style:italic;">No risk register entries for this sub-project.</p>
   </div>
@@ -646,6 +677,7 @@
   {% macro mac_compliance_matrix() %}
   <div class="page-break">
     <h2>Compliance Matrix</h2>
+    {{ _ci('compliance_matrix') }}
     <p>Control-by-control compliance status.</p>
     <p style="color:#6b7280;font-style:italic;">No compliance matrix data for this sub-project.</p>
   </div>
@@ -655,6 +687,7 @@
   {% macro mac_osint_findings() %}
   <div class="page-break">
     <h2>OSINT Findings</h2>
+    {{ _ci('osint_findings') }}
     <p>Public exposure, leaked data, and digital footprint analysis.</p>
     <p style="color:#6b7280;font-style:italic;">No OSINT data recorded for this sub-project.</p>
   </div>
@@ -664,6 +697,7 @@
   {% macro mac_recommendations() %}
   <div class="page-break">
     <h2>Recommendations</h2>
+    {{ _ci('recommendations') }}
     <p>
       Based on the findings of this assessment, the following strategic recommendations
       are provided to improve the overall security posture of
@@ -685,6 +719,7 @@
   {% macro mac_doc_control() %}
   <div class="page-break">
     <h2>Document Control</h2>
+    {{ _ci('doc_control') }}
     <table class="vuln-table" style="width:60%;">
       <thead><tr><th>Field</th><th>Value</th></tr></thead>
       <tbody>
@@ -702,6 +737,7 @@
   {% macro mac_findings_summary() %}
   <div class="page-break">
     <h2>Findings Summary</h2>
+    {{ _ci('findings_summary') }}
     <div class="kpi-row">
       <div class="kpi-box">
         <div class="kpi-number">{{ vulnerabilities|length }}</div>
@@ -733,6 +769,7 @@
   {% macro mac_attack_narrative() %}
   <div class="page-break">
     <h2>Attack Narrative</h2>
+    {{ _ci('attack_narrative') }}
     <p>
       This section describes the attack chain and exploitation path followed during the engagement,
       from initial access through to the final objective.
@@ -747,6 +784,7 @@
   {% macro mac_attack_paths() %}
   <div class="page-break">
     <h2>Attack Paths</h2>
+    {{ _ci('attack_paths') }}
     <p>
       Potential and observed attack paths identified during the assessment,
       including lateral movement vectors and privilege escalation routes.
@@ -776,6 +814,7 @@
   {% macro mac_cloud_posture_overview() %}
   <div class="page-break">
     <h2>Cloud Posture Overview</h2>
+    {{ _ci('cloud_posture_overview') }}
     <p>High-level assessment of cloud infrastructure security posture across assessed services.</p>
     {% if vulnerabilities %}
     <div class="chart-grid">
@@ -809,6 +848,7 @@
   {% macro mac_network_overview() %}
   <div class="page-break">
     <h2>Network Overview</h2>
+    {{ _ci('network_overview') }}
     <p>Summary of network assets, open services, and exposure identified during the assessment.</p>
     {% if charts.bar %}
     <div class="chart-full" style="margin-bottom:16px;">
@@ -838,6 +878,7 @@
   {% macro mac_owasp_coverage() %}
   <div class="page-break">
     <h2>OWASP Coverage</h2>
+    {{ _ci('owasp_coverage') }}
     <p>Mapping of findings to the OWASP Top 10 risk categories.</p>
     {% if charts.vulns_by_category %}
     <div class="chart-full" style="margin-bottom:16px;">
@@ -871,6 +912,7 @@
   {% macro mac_masvs_coverage() %}
   <div class="page-break">
     <h2>MASVS Coverage</h2>
+    {{ _ci('masvs_coverage') }}
     <p>Mapping of findings to OWASP Mobile Application Security Verification Standard controls.</p>
     {% if charts.vulns_by_category %}
     <div class="chart-full" style="margin-bottom:16px;">
@@ -899,6 +941,7 @@
   {% macro mac_engagement_overview() %}
   <div class="page-break">
     <h2>Engagement Overview</h2>
+    {{ _ci('engagement_overview') }}
     <table class="vuln-table" style="width:70%;">
       <thead><tr><th>Parameter</th><th>Value</th></tr></thead>
       <tbody>
@@ -917,6 +960,7 @@
   {% macro mac_mitre_mapping() %}
   <div class="page-break">
     <h2>MITRE ATT&amp;CK Mapping</h2>
+    {{ _ci('mitre_mapping') }}
     <p>
       The following table maps findings to MITRE ATT&amp;CK tactics and techniques
       to support threat modelling and detection engineering.
@@ -947,6 +991,7 @@
   {% macro mac_detection_gap() %}
   <div class="page-break">
     <h2>Detection Gap Analysis</h2>
+    {{ _ci('detection_gap') }}
     <p>
       This section highlights areas where the organization's detection and response
       capabilities may be insufficient to identify or contain the identified threats.
@@ -976,6 +1021,7 @@
   {% macro mac_digital_footprint() %}
   <div class="page-break">
     <h2>Digital Footprint</h2>
+    {{ _ci('digital_footprint') }}
     <p>
       Results of passive reconnaissance and OSINT activities identifying
       the organization's publicly exposed attack surface.
@@ -1007,6 +1053,7 @@
   {% macro mac_credential_exposure() %}
   <div class="page-break">
     <h2>Credential Exposure</h2>
+    {{ _ci('credential_exposure') }}
     <p>
       Findings related to leaked, weak, or exposed credentials discovered
       during the assessment phase.
@@ -1037,6 +1084,7 @@
   {% macro mac_appendix() %}
   <div class="page-break">
     <h2>Appendices</h2>
+    {{ _ci('appendix') }}
 
     {% if charts.timeline %}
     <h3>Vulnerability Timeline</h3>

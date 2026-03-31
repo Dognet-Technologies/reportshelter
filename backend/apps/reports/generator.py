@@ -258,8 +258,8 @@ class ReportGenerator:
         watermark = s.get("watermark")      or getattr(proj, "watermark_text",  None) or ""
         w_opacity = str(getattr(proj, "watermark_opacity", "0.15") or "0.15")
 
-        br_map = {"none": "0px", "sm": "2px", "md": "6px", "lg": "12px"}
-        br_px  = br_map.get(s.get("borderRadius", "md"), "6px")
+        br_map = {"none": "0px", "sm": "4px", "md": "10px", "lg": "20px"}
+        br_px  = br_map.get(s.get("borderRadius", "md"), "10px")
 
         ts_map = {
             "sm": {"h1": "20pt", "h2": "13pt", "h3": "10pt"},
@@ -276,7 +276,7 @@ class ReportGenerator:
             "watermark":        watermark,
             "watermark_opacity": w_opacity,
             "border_radius_px": br_px,
-            "evidence_style":   s.get("evidenceStyle", "code"),
+            "evidence_style":   s.get("evidenceStyle", "box"),
             "title_h1":         ts["h1"],
             "title_h2":         ts["h2"],
             "title_h3":         ts["h3"],
@@ -460,6 +460,8 @@ class ReportGenerator:
             "audience":          audience,
             # Pre-grouped data
             "hosts":             hosts,
+            # Per-section custom intro text
+            "section_overrides": self.options.get("section_overrides") or {},
         }
 
         template_file = "base.html"

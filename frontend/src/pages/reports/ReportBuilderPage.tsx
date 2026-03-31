@@ -19,7 +19,7 @@ import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import {
   Loader2, FileText, Download, CheckCircle2, AlertCircle,
   RefreshCw, Clock, ChevronLeft, Eye, GripVertical, Info,
-  X, Settings2,
+  X, Settings2, Pencil,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import {
@@ -605,17 +605,159 @@ function ExportStatusCard({ exportId }: { exportId: number }) {
   );
 }
 
+// ─── Dynamic section template generator ──────────────────────────────────────
+
+type VulnSummary = {
+  id: number; title: string; risk_level: string;
+  cvss_score: number | null; cve_id: string[];
+  affected_host: string; affected_port: string;
+  description: string; remediation: string;
+};
+
+function generateSectionTemplate(sectionId: string, vulns: VulnSummary[]): string {
+  const total = vulns.length;
+  const bySev = (l: string) => vulns.filter(v => v.risk_level === l).length;
+  const crit = bySev("critical"), high = bySev("high"), med = bySev("medium"),
+        low = bySev("low"), info = bySev("info");
+
+  // Top critical/high CVEs with CVSS score (if available)
+  const topCves = vulns
+    .filter(v => (v.risk_level === "critical" || v.risk_level === "high") && v.cve_id.length > 0)
+    .sort((a, b) => (b.cvss_score ?? 0) - (a.cvss_score ?? 0))
+    .slice(0, 3)
+    .map(v => `${v.cve_id[0]}${v.cvss_score ? ` (CVSS ${v.cvss_score.toFixed(1)})` : ""}: ${v.title}`)
+    .join("; ");
+
+  // Unique affected hosts
+  const hosts = [...new Set(vulns.map(v => v.affected_host).filter(Boolean))];
+  const hostSummary = hosts.length > 0
+    ? hosts.length <= 4
+      ? hosts.join(", ")
+      : `${hosts.slice(0, 3).join(", ")} and ${hosts.length - 3} other host${hosts.length - 4 !== 1 ? "s" : ""}`
+    : "the assessed systems";
+
+  const sevLine = `${total} vulnerabilit${total !== 1 ? "ies" : "y"} identified: `
+    + [crit && `${crit} Critical`, high && `${high} High`, med && `${med} Medium`,
+       low && `${low} Low`, info && `${info} Informational`]
+      .filter(Boolean).join(", ") + ".";
+
+  // Highest CVSS finding
+  const topCvss = vulns
+    .filter(v => v.cvss_score !== null)
+    .sort((a, b) => (b.cvss_score ?? 0) - (a.cvss_score ?? 0))[0];
+
+  switch (sectionId) {
+    case "executive_summary":
+      return [
+        `This report presents the results of the security assessment. ${sevLine}`,
+        crit + high > 0
+          ? `Immediate attention is required for the ${crit + high} Critical/High finding${crit + high !== 1 ? "s" : ""} detailed in the Remediation Plan section.`
+          : "No Critical or High severity findings were identified during this assessment.",
+        topCves ? `Notable CVEs include: ${topCves}.` : "",
+        `Affected systems: ${hostSummary}. A follow-up retest is recommended within 30–60 days of remediation completion.`,
+      ].filter(Boolean).join("\n\n");
+
+    case "findings_summary":
+      return [
+        sevLine,
+        crit + high > 0
+          ? `The concentration of ${crit + high} Critical/High findings represents a significant risk to the confidentiality, integrity, and availability of the assessed environment.`
+          : "The overall risk profile is moderate, with no Critical or High severity findings.",
+        topCvss
+          ? `The highest-severity finding is "${topCvss.title}"${topCvss.cvss_score ? ` with a CVSS score of ${topCvss.cvss_score.toFixed(1)}` : ""}, affecting ${topCvss.affected_host || "the target system"}.`
+          : "",
+      ].filter(Boolean).join("\n\n");
+
+    case "risk_summary": {
+      const riskLevel = crit > 0 ? "CRITICAL" : high > 3 ? "HIGH" : high > 0 ? "MEDIUM-HIGH" : med > 0 ? "MEDIUM" : "LOW";
+      return [
+        `The overall risk level of the assessed environment is ${riskLevel}. ${sevLine}`,
+        crit + high > 0
+          ? `The ${crit + high} Critical/High finding${crit + high !== 1 ? "s" : ""} pose${crit + high === 1 ? "s" : ""} a high likelihood of exploitation if left unaddressed. Without timely remediation, the risk of a successful breach is considered HIGH.`
+          : "The absence of Critical and High findings indicates a relatively low immediate exploitation risk.",
+      ].filter(Boolean).join("\n\n");
+    }
+
+    case "vuln_details":
+      return `The following section details all ${total} vulnerabilit${total !== 1 ? "ies" : "y"} identified during the assessment, ordered by severity. Each finding includes a risk rating, technical description, evidence, and specific remediation guidance.\n\nSeverity ratings follow the CVSS v3.1 standard.${topCvss ? ` CVSS scores range from ${Math.min(...vulns.filter(v => v.cvss_score !== null).map(v => v.cvss_score as number)).toFixed(1)} to ${topCvss.cvss_score!.toFixed(1)}.` : ""} Findings marked [CONFIRMED EXPLOITABLE] were demonstrated during the engagement.`;
+
+    case "host_breakdown":
+      return `This section groups all ${total} identified vulnerabilit${total !== 1 ? "ies" : "y"} by affected host to facilitate remediation ownership assignment. ${hosts.length} distinct host${hosts.length !== 1 ? "s were" : " was"} affected: ${hostSummary}.\n\nEach system owner should review the findings attributed to their systems and agree remediation timelines accordingly.`;
+
+    case "remediation_plan":
+      return [
+        `The following remediation plan prioritises all ${total} identified finding${total !== 1 ? "s" : ""} by severity and business impact.`,
+        "Recommended SLAs: Critical — remediate within 24–72 hours; High — within 2 weeks; Medium — within 30 days; Low/Informational — within 90 days.",
+        topCves ? `Priority actions should focus on: ${topCves}.` : "",
+        "All remediations should be verified through retesting before the finding is marked as resolved.",
+      ].filter(Boolean).join("\n\n");
+
+    case "scope":
+      return `The scope of this assessment encompassed the systems and services as defined in the Statement of Work. ${hosts.length > 0 ? `A total of ${hosts.length} host${hosts.length !== 1 ? "s were" : " was"} assessed: ${hostSummary}.` : ""}\n\nThe assessment was conducted following industry-standard methodologies including OWASP Testing Guide and PTES (Penetration Testing Execution Standard). All testing was performed within the authorised timeframe and within the agreed rules of engagement.`;
+
+    case "attack_narrative":
+    case "attack_paths":
+      return `${crit + high > 0 ? `${crit + high} Critical/High severity finding${crit + high !== 1 ? "s were" : " was"} identified that could be chained to form an attack path.` : ""}\n\nThe following section describes the attack chain and exploitation path${total > 1 ? "s" : ""} identified during the assessment. ${topCvss ? `The entry point with the highest exploitability is "${topCvss.title}"${topCvss.cve_id.length > 0 ? ` (${topCvss.cve_id[0]})` : ""}.` : ""}`.trim();
+
+    case "diff_retest":
+      return `This section compares the current assessment results against the findings documented in the previous report. ${sevLine}\n\nOf the findings from the previous assessment, the table below shows which have been fully remediated, which remain open, and any newly introduced vulnerabilities identified in this round.`;
+
+    case "recommendations":
+      return [
+        `Based on the ${total} finding${total !== 1 ? "s" : ""} identified in this assessment, the following strategic recommendations are provided to address root causes and improve the organisation's overall security posture.`,
+        crit + high > 0 ? `Priority: immediately address the ${crit + high} Critical/High finding${crit + high !== 1 ? "s" : ""}. These represent the highest risk to the environment and require urgent remediation.` : "",
+        "Recommendations are categorised as: Quick Win (< 2 weeks), Short-Term (1–3 months), and Strategic (3–12 months).",
+      ].filter(Boolean).join("\n\n");
+
+    case "compliance_matrix":
+      return `The following matrix maps the ${total} assessment finding${total !== 1 ? "s" : ""} against the applicable control framework. Non-Compliant controls are directly linked to one or more findings in the Vulnerability Details section.\n\nRemediation of the associated findings is expected to bring those controls to a Compliant state. Controls marked as Not Assessed were outside the scope of this engagement.`;
+
+    case "owasp_coverage":
+    case "masvs_coverage": {
+      const cats = [...new Set(vulns.map(v => (v as any).category).filter(Boolean))];
+      return `${total > 0 ? `${total} finding${total !== 1 ? "s were" : " was"} mapped to the framework categories.` : ""} ${cats.length > 0 ? `Categories affected: ${cats.slice(0, 5).join(", ")}${cats.length > 5 ? "..." : ""}.` : ""}\n\nCategories with multiple findings indicate systemic weaknesses that should be addressed through targeted secure development training and framework-level controls rather than individual bug fixes.`.trim();
+    }
+
+    case "network_overview":
+      return `Network discovery identified ${hosts.length} live host${hosts.length !== 1 ? "s" : ""} across the assessed environment: ${hostSummary}. ${sevLine}\n\nServices exposed to untrusted network segments have been flagged as priority findings. All management interfaces accessible from external or untrusted networks should be reviewed and restricted.`;
+
+    case "cloud_posture_overview":
+      return `Cloud security assessment identified ${total} finding${total !== 1 ? "s" : ""} across the assessed cloud environment. ${sevLine}\n\nFindings are grouped by cloud security domain (IAM, Storage, Network, Compute, Logging) in the table below. Domains with Critical or High findings require immediate attention.`;
+
+    case "mitre_mapping":
+      return `The techniques observed during this engagement have been mapped to the MITRE ATT\u0026CK Enterprise framework to support detection engineering and threat modelling.\n\n${topCves ? `Key findings linked to known TTPs include: ${topCves}.` : ""}\n\nOrganisations are encouraged to use this mapping as input to SIEM rule development and EDR tuning, prioritising techniques with no current detection coverage.`.trim();
+
+    case "detection_gap":
+      return `This section identifies gaps in the organisation's detection capabilities based on the ${total} finding${total !== 1 ? "s" : ""} observed during the engagement.${crit + high > 0 ? ` The ${crit + high} Critical/High finding${crit + high !== 1 ? "s" : ""} represent${crit + high === 1 ? "s" : ""} the highest priority for detection rule development.` : ""}\n\nFor each undetected technique, a recommended detection approach is provided. Detection gaps are rated by priority: Critical (immediate), High (30 days), Medium (90 days).`;
+
+    case "credential_exposure":
+    case "osint_findings":
+    case "digital_footprint":
+      return `The following findings were identified through passive reconnaissance and open-source intelligence gathering. All data was collected from publicly available sources without direct interaction with the target systems.\n\nAll exposed credentials should have passwords reset immediately and MFA enabled. Exposed infrastructure and data should be reviewed for necessity and access restricted accordingly.`;
+
+    default:
+      return "";
+  }
+}
+
 // ─── Section drag-and-drop list ───────────────────────────────────────────────
 
 interface SectionListProps {
   orderedIds: string[];
   enabledIds: Set<string>;
+  overrides: Record<string, { custom_text: string }>;
+  availableVulns: VulnSummary[];
   onReorder: (ids: string[]) => void;
   onToggle: (id: string) => void;
+  onOverrideChange: (sectionId: string, text: string) => void;
 }
 
-function SectionList({ orderedIds, enabledIds, onReorder, onToggle }: SectionListProps) {
+function SectionList({
+  orderedIds, enabledIds, overrides, availableVulns,
+  onReorder, onToggle, onOverrideChange,
+}: SectionListProps) {
   const dragIndex = useRef<number | null>(null);
+  const [expandedSection, setExpandedSection] = useState<string | null>(null);
 
   function handleDragStart(i: number) { dragIndex.current = i; }
 
@@ -629,6 +771,16 @@ function SectionList({ orderedIds, enabledIds, onReorder, onToggle }: SectionLis
     onReorder(next);
   }
 
+  function toggleEditor(id: string) {
+    setExpandedSection((prev) => (prev === id ? null : id));
+  }
+
+  function insertFinding(sectionId: string, title: string, level: string) {
+    const current = overrides[sectionId]?.custom_text ?? "";
+    const insertion = `[${title} — ${level.toUpperCase()}]`;
+    onOverrideChange(sectionId, current ? `${current}\n${insertion}` : insertion);
+  }
+
   const sections = orderedIds.map((id) => REPORT_SECTIONS.find((s) => s.id === id)!).filter(Boolean);
 
   return (
@@ -636,36 +788,150 @@ function SectionList({ orderedIds, enabledIds, onReorder, onToggle }: SectionLis
       {sections.map((sec, i) => {
         const enabled = enabledIds.has(sec.id);
         const required = sec.required;
+        const customText = overrides[sec.id]?.custom_text ?? "";
+        const isExpanded = expandedSection === sec.id;
+        const hasText = customText.trim().length > 0;
+
         return (
-          <div
-            key={sec.id}
-            draggable={!required}
-            onDragStart={() => handleDragStart(i)}
-            onDragOver={(e) => handleDragOver(e, i)}
-            className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors select-none ${
-              enabled ? "border-blue-600/50 bg-blue-950/20" : "border-slate-800 opacity-50"
-            } ${!required ? "cursor-grab active:cursor-grabbing" : ""}`}
-          >
-            {required ? (
-              <span className="text-slate-600 w-4 h-4 shrink-0" />
-            ) : (
-              <GripVertical className="h-4 w-4 text-slate-600 shrink-0" />
-            )}
-            <input
-              type="checkbox"
-              checked={enabled}
-              disabled={required}
-              onChange={() => !required && onToggle(sec.id)}
-              className="rounded border-slate-600 bg-slate-800 text-blue-500 shrink-0"
-            />
-            <span className="text-base shrink-0">{sec.icon}</span>
-            <div className="flex-1 min-w-0">
-              <p className={`text-sm font-medium ${enabled ? "text-slate-100" : "text-slate-500"}`}>
-                {sec.label}
-                {required && <span className="ml-1.5 text-[10px] text-slate-600 font-normal">(required)</span>}
-              </p>
-              <p className="text-xs text-slate-600 truncate">{sec.desc}</p>
+          <div key={sec.id}>
+            {/* ── Main row ── */}
+            <div
+              draggable={!required}
+              onDragStart={() => handleDragStart(i)}
+              onDragOver={(e) => handleDragOver(e, i)}
+              className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors select-none ${
+                isExpanded
+                  ? "border-blue-500/70 bg-blue-950/30 rounded-b-none"
+                  : enabled
+                  ? "border-blue-600/50 bg-blue-950/20"
+                  : "border-slate-800 opacity-50"
+              } ${!required ? "cursor-grab active:cursor-grabbing" : ""}`}
+            >
+              {required ? (
+                <span className="w-4 h-4 shrink-0" />
+              ) : (
+                <GripVertical className="h-4 w-4 text-slate-600 shrink-0" />
+              )}
+              <input
+                type="checkbox"
+                checked={enabled}
+                disabled={required}
+                onChange={() => !required && onToggle(sec.id)}
+                className="rounded border-slate-600 bg-slate-800 text-blue-500 shrink-0"
+              />
+              <span className="text-base shrink-0">{sec.icon}</span>
+              <div className="flex-1 min-w-0">
+                <p className={`text-sm font-medium ${enabled ? "text-slate-100" : "text-slate-500"}`}>
+                  {sec.label}
+                  {required && <span className="ml-1.5 text-[10px] text-slate-600 font-normal">(required)</span>}
+                  {hasText && !isExpanded && (
+                    <span className="ml-2 inline-block w-1.5 h-1.5 rounded-full bg-blue-400 align-middle" title="Has custom intro text" />
+                  )}
+                </p>
+                <p className="text-xs text-slate-600 truncate">{sec.desc}</p>
+              </div>
+              {/* Edit button — hidden for structural sections (cover, last_page) */}
+              {!required && (
+                <button
+                  onClick={() => toggleEditor(sec.id)}
+                  title="Edit section intro text"
+                  className={`shrink-0 p-1 rounded transition-colors ${
+                    isExpanded
+                      ? "text-blue-400 bg-blue-900/40"
+                      : hasText
+                      ? "text-blue-500 hover:text-blue-300"
+                      : "text-slate-600 hover:text-slate-400"
+                  }`}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
+              )}
             </div>
+
+            {/* ── Inline editor (expanded) ── */}
+            {isExpanded && (
+              <div className="border border-t-0 border-blue-500/70 rounded-b-lg bg-slate-900/80 px-3 pb-3 pt-2.5 space-y-2.5">
+
+                {/* Section identity */}
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-slate-200 leading-tight">
+                      {sec.reportTitle}
+                      <span className="ml-2 text-[10px] font-normal text-slate-500">— heading in the document</span>
+                    </p>
+                    <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">{sec.desc}</p>
+                  </div>
+                  {/* Generate / Use template button */}
+                  {!customText.trim() && (sec.example || availableVulns.length > 0) && (() => {
+                    const dynamic = generateSectionTemplate(sec.id, availableVulns);
+                    const hasDynamic = !!dynamic;
+                    return (
+                      <button
+                        onClick={() => onOverrideChange(sec.id, dynamic || sec.example)}
+                        className="shrink-0 rounded border border-slate-600 bg-slate-800/60 px-2.5 py-1 text-[10px] text-slate-300 hover:border-blue-500 hover:text-blue-300 transition-colors whitespace-nowrap"
+                      >
+                        {hasDynamic ? "Generate from findings" : "Use template"}
+                      </button>
+                    );
+                  })()}
+                </div>
+
+                {/* Textarea */}
+                <textarea
+                  value={customText}
+                  onChange={(e) => onOverrideChange(sec.id, e.target.value)}
+                  placeholder={
+                    sec.example
+                      ? `Example: "${sec.example.slice(0, 120)}…"`
+                      : "Write an introductory paragraph for this section…"
+                  }
+                  rows={5}
+                  className="w-full rounded border border-slate-700 bg-slate-800 text-sm text-slate-200 px-3 py-2 resize-y focus:outline-none focus:border-blue-500 placeholder:text-slate-600/80 placeholder:italic"
+                />
+
+                {/* Insert finding chips */}
+                {availableVulns.length > 0 && (
+                  <div>
+                    <p className="text-[10px] text-slate-500 mb-1.5">
+                      Insert finding reference — click to append to text:
+                    </p>
+                    <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto">
+                      {availableVulns.slice(0, 30).map((v) => (
+                        <button
+                          key={v.id}
+                          onClick={() => insertFinding(sec.id, v.title, v.risk_level)}
+                          title={v.title}
+                          className="flex items-center gap-1.5 rounded border border-slate-700 bg-slate-800 px-2 py-0.5 text-[10px] text-slate-300 hover:border-slate-500 hover:text-slate-100 transition-colors max-w-[220px]"
+                        >
+                          <span className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 ${
+                            v.risk_level === "critical" ? "bg-red-500" :
+                            v.risk_level === "high"     ? "bg-orange-500" :
+                            v.risk_level === "medium"   ? "bg-yellow-500" :
+                            v.risk_level === "low"      ? "bg-blue-500"   : "bg-slate-500"
+                          }`} />
+                          <span className="truncate">{v.title}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Bottom actions */}
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] text-slate-600">
+                    This text appears in the PDF immediately after the &ldquo;{sec.reportTitle}&rdquo; heading.
+                  </p>
+                  {customText.trim() && (
+                    <button
+                      onClick={() => onOverrideChange(sec.id, "")}
+                      className="text-[10px] text-slate-600 hover:text-slate-400 transition-colors"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         );
       })}
@@ -675,7 +941,13 @@ function SectionList({ orderedIds, enabledIds, onReorder, onToggle }: SectionLis
 
 // ─── Section preview (right sidebar) ─────────────────────────────────────────
 
-function SectionPreview({ orderedIds, enabledIds }: { orderedIds: string[]; enabledIds: Set<string> }) {
+function SectionPreview({
+  orderedIds, enabledIds, overrides,
+}: {
+  orderedIds: string[];
+  enabledIds: Set<string>;
+  overrides: Record<string, { custom_text: string }>;
+}) {
   const visible = orderedIds
     .filter((id) => enabledIds.has(id))
     .map((id) => REPORT_SECTIONS.find((s) => s.id === id)!)
@@ -691,7 +963,10 @@ function SectionPreview({ orderedIds, enabledIds }: { orderedIds: string[]; enab
           <div key={sec.id} className="flex items-center gap-2 py-1 border-b border-slate-800/60 last:border-0">
             <span className="text-xs text-slate-600 w-4 text-right shrink-0">{i + 1}</span>
             <span className="text-sm shrink-0">{sec.icon}</span>
-            <span className="text-xs text-slate-300 truncate">{sec.label}</span>
+            <span className="text-xs text-slate-300 truncate flex-1">{sec.label}</span>
+            {overrides[sec.id]?.custom_text.trim() && (
+              <Pencil className="h-2.5 w-2.5 text-blue-500 shrink-0" />
+            )}
           </div>
         ))}
       </div>
@@ -721,6 +996,7 @@ interface IncomingConfig {
   format?: ReportFormat;
   risk_levels?: string[];
   statuses?: VulnStatus[];
+  section_overrides?: Record<string, { custom_text?: string }>;
 }
 
 /**
@@ -815,6 +1091,20 @@ export default function ReportBuilderPage() {
   const rptExtra = incoming?.extra ?? undefined;
   const [generatedExportId, setGeneratedExportId] = useState<number | null>(null);
 
+  // Per-section custom intro text
+  const [sectionOverrides, setSectionOverrides] = useState<Record<string, { custom_text: string }>>(
+    () => {
+      const raw = incoming?.section_overrides ?? {};
+      return Object.fromEntries(
+        Object.entries(raw).map(([k, v]) => [k, { custom_text: v.custom_text ?? "" }])
+      );
+    }
+  );
+
+  function handleOverrideChange(sectionId: string, text: string) {
+    setSectionOverrides((prev) => ({ ...prev, [sectionId]: { custom_text: text } }));
+  }
+
   // Auto-configure charts whenever report type or audience changes
   useEffect(() => {
     if (!reportType) return;
@@ -866,6 +1156,7 @@ export default function ReportBuilderPage() {
     if (filteredVulns.length === 0) { toast.error("No vulnerabilities match the selected filters."); return; }
     if (enabledSections.size === 0) { toast.error("Select at least one report section."); return; }
     try {
+      const activeOverrides = Object.entries(sectionOverrides).filter(([, v]) => v.custom_text.trim());
       const activeCharts = Object.fromEntries(
         Object.entries(enabledCharts).filter(([, v]) => v)
       );
@@ -882,6 +1173,9 @@ export default function ReportBuilderPage() {
         ...(Object.keys(activeCharts).length > 0 ? { charts_enabled: activeCharts } : {}),
         ...(Object.keys(chartVariants).length > 0 ? { charts_variants: chartVariants } : {}),
         ...(Object.keys(chartDetails).length > 0 ? { charts_details: chartDetails } : {}),
+        ...(activeOverrides.length > 0
+          ? { section_overrides: Object.fromEntries(activeOverrides) }
+          : {}),
       });
       setGeneratedExportId(result.id);
       toast.success("Report generation started!");
@@ -986,13 +1280,21 @@ export default function ReportBuilderPage() {
           <div className="card">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-slate-100">Report Sections</h3>
-              <span className="text-xs text-slate-500">{enabledSections.size} selected · drag to reorder</span>
+              <span className="text-xs text-slate-500">
+                {enabledSections.size} selected · drag to reorder
+                {Object.values(sectionOverrides).some((v) => v.custom_text.trim()) && (
+                  <> · <span className="text-blue-400">{Object.values(sectionOverrides).filter((v) => v.custom_text.trim()).length} edited</span></>
+                )}
+              </span>
             </div>
             <SectionList
               orderedIds={orderedSections}
               enabledIds={enabledSections}
+              overrides={sectionOverrides}
+              availableVulns={filteredVulns}
               onReorder={handleReorder}
               onToggle={toggleSection}
+              onOverrideChange={handleOverrideChange}
             />
           </div>
 
@@ -1062,7 +1364,7 @@ export default function ReportBuilderPage() {
         {/* ── Right column ── */}
         <div className="space-y-4">
           {/* Section preview */}
-          <SectionPreview orderedIds={orderedSections} enabledIds={enabledSections} />
+          <SectionPreview orderedIds={orderedSections} enabledIds={enabledSections} overrides={sectionOverrides} />
 
           {/* Vuln summary */}
           <div className="card">

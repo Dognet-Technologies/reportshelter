@@ -4,6 +4,19 @@ import re
 from datetime import date, datetime
 
 from jinja2 import Environment
+from markupsafe import Markup
+
+
+def _nl2br(value: str) -> Markup:
+    """Convert plain text to HTML: escape, then replace newlines with <br/>."""
+    escaped = (
+        str(value)
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
+    return Markup(escaped.replace("\n", "<br/>\n"))
 
 
 def _format_date(value: date | datetime | None, fmt: str = "%d %B %Y") -> str:
@@ -57,6 +70,7 @@ def environment(**options) -> Environment:
     env.filters["format_date"] = _format_date
     env.filters["severity_badge"] = _severity_badge
     env.filters["cvss_color"] = _cvss_color
+    env.filters["nl2br"] = _nl2br
     env.globals["now"] = datetime.utcnow
     # Custom tests
     env.tests["search"] = _test_search

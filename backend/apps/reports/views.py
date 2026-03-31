@@ -79,6 +79,14 @@ class ReportGenerateView(APIView):
             options["charts_variants"] = data["charts_variants"]
         if data.get("charts_details"):
             options["charts_details"] = data["charts_details"]
+        if data.get("section_overrides"):
+            # Sanitise: keep only entries whose value is a dict with a non-empty
+            # 'custom_text' string, so the template never receives malformed data.
+            options["section_overrides"] = {
+                k: {"custom_text": str(v.get("custom_text", ""))}
+                for k, v in data["section_overrides"].items()
+                if isinstance(v, dict) and v.get("custom_text")
+            }
 
         from .generator import REPORT_TYPE_LABELS
         report_type_val = data.get("report_type", "")

@@ -139,7 +139,7 @@ export interface Vulnerability {
   affected_host: string;
   affected_port: string;
   affected_service: string;
-  cve_id: string;
+  cve_id: string[];
   cvss_score: number | null;
   cvss_vector: string;
   epss_score: number | null;

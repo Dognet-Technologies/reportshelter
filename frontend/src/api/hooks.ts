@@ -534,6 +534,8 @@ export function useGenerateReport() {
         show_grid?: boolean;
         mode_3d?: boolean;
       }>;
+      /** Custom intro text per section, keyed by section ID. */
+      section_overrides?: Record<string, { custom_text?: string }>;
     }) =>
       apiClient.post<ReportExport>("/reports/generate/", data).then((r) => r.data),
     onSuccess: (report) => {

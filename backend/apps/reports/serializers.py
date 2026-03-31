@@ -102,6 +102,15 @@ class ReportGenerateSerializer(serializers.Serializer):
         ),
     )
 
+    # Per-section custom intro text, keyed by section ID.
+    section_overrides = serializers.DictField(
+        required=False,
+        help_text=(
+            "Custom intro text per section, keyed by section ID. "
+            "Each value is an object with a 'custom_text' key."
+        ),
+    )
+
     # Chart configuration (from SubProjectPage ChartsPanel)
     charts_enabled = serializers.DictField(
         child=serializers.BooleanField(),

@@ -90,14 +90,48 @@ const AUDIENCE_LABELS: Record<string, string> = {
 const CLASSIFICATION_LEVELS = ["PUBLIC","INTERNAL","CONFIDENTIAL","RESTRICTED","TOP SECRET"];
 const METHODOLOGIES = ["OWASP Testing Guide","PTES","OSSTMM","NIST SP 800-115","NIST CSF","ISO 27001","MITRE ATT&CK","TIBER-EU","DORA"];
 const SCANNER_OPTIONS = [
-  { value: "nmap",     label: "Nmap (XML)" },
-  { value: "nikto",    label: "Nikto (XML)" },
-  { value: "burp",     label: "Burp Suite (XML)" },
-  { value: "zap",      label: "OWASP ZAP (XML/JSON)" },
-  { value: "metasploit",label:"Metasploit (XML)" },
-  { value: "openvas",  label: "OpenVAS / Greenbone (XML or CSV)" },
-  { value: "nessus",   label: "Nessus (CSV)" },
-  { value: "csv",      label: "Generic CSV" },
+  // ── Original ─────────────────────────────────────────────
+  { value: "nmap",                label: "Nmap (XML)" },
+  { value: "nikto",               label: "Nikto (XML)" },
+  { value: "burp",                label: "Burp Suite (XML)" },
+  { value: "zap",                 label: "OWASP ZAP (XML/JSON)" },
+  { value: "metasploit",          label: "Metasploit (XML)" },
+  { value: "openvas",             label: "OpenVAS / Greenbone (XML/CSV)" },
+  { value: "nessus",              label: "Nessus (CSV)" },
+  { value: "csv",                 label: "Generic CSV" },
+  // ── Cloud & Infrastructure ────────────────────────────────
+  { value: "aws_inspector2",      label: "AWS Inspector v2 (JSON)" },
+  { value: "awssecurityhub",      label: "AWS Security Hub (JSON)" },
+  { value: "cloudsploit",         label: "CloudSploit (JSON)" },
+  { value: "dockerbench",         label: "Docker Bench Security (JSON)" },
+  { value: "nexpose",             label: "Nexpose / InsightVM (XML)" },
+  { value: "qualys",              label: "Qualys Infrastructure (CSV/XML)" },
+  { value: "qualys_webapp",       label: "Qualys Web App Scanner (XML)" },
+  { value: "redhatsatellite",     label: "Red Hat Satellite (JSON)" },
+  { value: "sysdig",              label: "Sysdig (JSON/CSV)" },
+  { value: "trivy",               label: "Trivy (JSON)" },
+  // ── Web & Application ─────────────────────────────────────
+  { value: "acunetix",            label: "Acunetix / Acunetix 360 (XML/JSON)" },
+  { value: "arachni",             label: "Arachni (JSON)" },
+  { value: "immuniweb",           label: "ImmuniWeb (JSON/XML)" },
+  { value: "netsparker",          label: "Netsparker / Invicti (JSON)" },
+  { value: "nuclei",              label: "Nuclei (JSON/JSONL)" },
+  { value: "sslscan",             label: "SSLScan (XML)" },
+  { value: "wapiti",              label: "Wapiti (XML)" },
+  { value: "wfuzz",               label: "WFuzz (JSON)" },
+  { value: "wpscan",              label: "WPScan (JSON)" },
+  // ── Code & Secret Scanning ────────────────────────────────
+  { value: "cargo_audit",         label: "Cargo Audit (JSON)" },
+  { value: "codechecker",         label: "CodeChecker (JSON)" },
+  { value: "gitleaks",            label: "Gitleaks (JSON)" },
+  { value: "github_vulnerability",label: "GitHub Security Alerts (JSON)" },
+  { value: "gitlab_container_scan",label:"GitLab Container Scan (JSON)" },
+  { value: "sonarqube",           label: "SonarQube (JSON)" },
+  // ── Network & Credential ──────────────────────────────────
+  { value: "cobalt",              label: "Cobalt.io (CSV)" },
+  { value: "cycognito",           label: "CyCognito (JSON)" },
+  { value: "hydra",               label: "Hydra (JSON)" },
+  { value: "ssh_audit",           label: "ssh-audit (JSON)" },
 ];
 
 // ─── Config State Defaults ────────────────────────────────────────────────────
@@ -215,11 +249,23 @@ function StylePanel({ style, onChange }: { style: StyleConfig; onChange: (s: Sty
       <div>
         <label className="label">Border Radius</label>
         <div className="flex gap-2 mt-1">
-          {[["none","Sharp"],["sm","Soft"],["md","Rounded"],["lg","Pill"]].map(([v, l]) => (
+          {([ ["none","Sharp","0px"], ["sm","Soft","4px"], ["md","Rounded","10px"], ["lg","Pill","20px"] ] as [string,string,string][]).map(([v, l, px]) => (
             <button key={v} onClick={() => set("borderRadius", v)}
-              className={`px-3 py-1 text-xs rounded border transition-colors ${style.borderRadius === v ? "border-blue-500 bg-blue-950/50 text-blue-200" : "border-slate-700 text-slate-400"}`}
+              className={`px-3 py-1 text-xs border transition-colors ${style.borderRadius === v ? "border-blue-500 bg-blue-950/50 text-blue-200" : "border-slate-700 text-slate-400"}`}
+              style={{ borderRadius: px }}
             >{l}</button>
           ))}
+        </div>
+        {/* Live preview mini-card */}
+        <div className="mt-2 flex items-center gap-3">
+          <div
+            className="border border-slate-600 bg-slate-800/60 px-3 py-1 text-[9px] text-slate-300 leading-none"
+            style={{ borderRadius: { none:"0px", sm:"4px", md:"10px", lg:"20px" }[style.borderRadius as "none"|"sm"|"md"|"lg"] ?? "10px" }}
+          >HIGH</div>
+          <div
+            className="border border-slate-600 bg-slate-800/40 px-4 py-2 text-[9px] text-slate-400"
+            style={{ borderRadius: { none:"0px", sm:"4px", md:"10px", lg:"20px" }[style.borderRadius as "none"|"sm"|"md"|"lg"] ?? "10px" }}
+          >Vuln card</div>
         </div>
       </div>
       {/* Primary color */}
@@ -250,6 +296,17 @@ function StylePanel({ style, onChange }: { style: StyleConfig; onChange: (s: Sty
             >{l}</button>
           ))}
         </div>
+        {/* Live evidence style preview */}
+        <div className="mt-2 font-mono text-[9px] leading-snug px-2 py-1.5 max-w-xs"
+          style={style.evidenceStyle === "code"
+            ? { background:"#1f2937", color:"#f9fafb", borderRadius:"4px" }
+            : style.evidenceStyle === "box"
+            ? { background:"#0f172a", color:"#94a3b8", border:"1px solid #334155", borderRadius:"4px" }
+            : style.evidenceStyle === "shaded"
+            ? { background:"#1e293b", color:"#94a3b8", borderRadius:"4px" }
+            : /* marker */ { background:"#0c1a2e", color:"#94a3b8", borderLeft:`3px solid ${style.primaryColor}`, paddingLeft:"8px" }
+          }
+        >$ nmap -sV 192.168.1.1{"\n"}PORT  STATE SERVICE</div>
       </div>
       {/* Watermark */}
       <div className="sm:col-span-2 lg:col-span-3">
