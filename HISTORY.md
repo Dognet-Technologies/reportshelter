@@ -1,115 +1,233 @@
 # Shelter — Decision History
 
-Questo file registra le scelte architetturali e implementative significative,
-con la motivazione e le alternative scartate.
+Questo file documenta le decisioni architetturali, i bug risolti e le motivazioni
+che hanno guidato ogni scelta non ovvia. Consultarlo all'inizio di ogni sessione
+per evitare di ripercorrere strade già esplorate.
+
+---
+
+## 2026-03-30 — Parser coverage, Style fixes, Editable Sections
+
+### Contesto
+
+Sessione di continuazione. Parser e style erano parzialmente completati nella
+sessione precedente. Editable sections è stata progettata nella sessione
+precedente e implementata in questa.
+
+---
+
+### 1. Fix parser: Trivy legacy array format e Qualys XML
+
+**Problema:**
+- `trivy_parser.py`: file con formato Trivy v1 dove la root è una lista
+  (non `{Results:[...]}`). Il parser crashava su `isinstance(None, dict)` e
+  `isinstance(None, list)` per il caso `null`.
+- `qualys_parser.py`: file XML `ASSET_DATA_REPORT` — il parser CSV tentava di
+  leggere chiavi `None` su contenuto XML.
+- `nuclei_parser.py`: `raw_output=line[:2048]` crashava per input JSON array
+  perché `line` è definita solo nel loop JSONL.
+- `github_vulnerability_parser.py`: lista flat REST API non riconosciuta
+  (atteso formato GraphQL Security Alerts).
+
+**Decisioni:**
+
+*Trivy*: aggiunto `if data is None: return []` prima dei check isinstance, poi
+branch `isinstance(data, list)`. Alternativa scartata: parser separato
+`trivy_legacy` — overhead non giustificato, il formato è distinguibile in runtime.
+
+*Qualys*: rilevamento XML tramite `stripped.startswith("<?xml")` o
+`"<ASSET_DATA_REPORT"`, routing a `_parse_xml()` separato. Glossario QID
+costruito una volta sola.
+
+*Nuclei*: `raw_output=line[:2048]` → `json.dumps(obj, default=str)[:2048]`.
+
+*GitHub*: aggiunto `isinstance(data, list) → _parse_code_scanning(data)`.
+Scartato: parametro `format_hint` — la detection automatica è più robusta.
+
+---
+
+### 2. Fix Style: Border Radius e Evidence Highlight
+
+**Problema:** le opzioni stile non avevano effetto visibile:
+- Border radius 0/2/6/12px indistinguibili in PDF.
+- Evidence highlight ignorato per audience `executive`.
+- Default `"code"` nel generator vs `"box"` nel frontend.
+
+**Fix:** valori aggiornati a 0/4/10/20px; rimosso gate `audience == 'technical'`
+(il contenuto è scritto manualmente dall'utente — sempre pertinente); default
+allineato a `"box"` ovunque.
+
+---
+
+### 3. Fix: Nuovi parser non visibili nel dropdown
+
+`SCANNER_OPTIONS` in `SubProjectPage.tsx` conteneva solo 8 entry originali.
+Espanso a 37 entry, organizzate in 5 gruppi logici (Original, Cloud & Infra,
+Web & Application, Code & Secret Scanning, Network & Credential).
+
+Scartato: endpoint dinamico `/parsers/available/` — over-engineering per una
+lista statica che cambia solo quando si aggiungono parser.
+
+---
+
+### 4. Feature: Report Sections editabili
+
+**Struttura dati:** `options.section_overrides = {section_id: {custom_text: str}}`
+nel JSONField esistente di `ReportExport`.
+
+**Perché JSONField e non nuovo modello DB:** nessuna migration, la sezione
+override è parte della configurazione del report (non ha lifecycle proprio),
+coerente con `style`, `extra`, `charts_*` già in `options`.
+
+**Scartato:** `SectionOverride(export, section_id, custom_text)` — complessità
+relazionale inutile per dati che vivono e muoiono con l'export.
+**Scartato:** localStorage — perderebbe i dati alla riapertura di un export.
+
+**Template — macro `_ci(sid)`:** helper centralizzato che legge
+`section_overrides.get(sid, {}).get('custom_text', '')`, applica `nl2br`
+(con `Markup` per evitare double-escaping), e renderizza solo se non vuoto.
+Guard `is defined` + `is mapping` proteggono da `UndefinedError` e input
+malformato.
+
+**Sanitizzazione in views.py:** filtra entry non-dict e `custom_text` vuoto
+prima di salvare; forza `str()` per sicurezza di tipo.
+
+**UI — inline editor:** espansione inline sotto la riga (non modal/drawer).
+Chips cliccabili per inserire finding, limitate alle prime 30 vuln filtrate.
+Blue dot sull'header di riga per sezioni con testo.
+
+---
+
+### Bug risolti (2026-03-30)
+
+| Bug | Fix |
+|-----|-----|
+| Trivy root=null crash | `if data is None: return []` |
+| Trivy v1 root=list crash | `isinstance(data, list)` branch |
+| Nuclei `UnboundLocalError` per `line` | `json.dumps(obj)[:2048]` |
+| GitHub Code Scanning list format | `isinstance(data, list) → _parse_code_scanning()` |
+| Evidence non visibile per executive | Rimosso gate `audience == 'technical'` |
+| Border radius indistinguibile in PDF | Valori 0/4/10/20px (erano 0/2/6/12) |
+| Evidence default mismatch | `s.get("evidenceStyle", "box")` |
+| Nuovi parser non nel dropdown | `SCANNER_OPTIONS` espanso a 37 entry |
+| `_ci` macro crash se `section_overrides` undefined | Guard `is defined` in macro |
+| `section_overrides` invia entry vuote | Filtra `v.custom_text.trim()` prima di inviare |
+
+**Stato parser al 2026-03-30:** 209 test OK / 12 WARN intenzionali (file
+non-parseable, formati alternativi documentati come non supportati).
+Parser registrati: 37 nel `PARSER_REGISTRY`, 37 nel `SCANNER_OPTIONS` frontend.
+
+---
+
+## 2026-03-31 — NVD enrichment fix, CI/CD, fix licenza
+
+### 1. Fix `cve_id` type mismatch
+
+Backend: `cve_id = models.JSONField(default=list)` restituisce `string[]`.
+Frontend aveva `cve_id: string` in `types.ts`. Fix: cambiato in `string[]`
+ovunque; `[0]` per il CVE primario; `.join(", ")` per il display; form wrappa
+il valore in `[value]` al submit.
+
+### 2. Fix licenza: `_configured` AttributeError
+
+`_validate_pro_online` chiamava `client._configured` ma la property non era
+definita su `WPLicenseClient`. Dopo 12h dall'attivazione il check online
+scatenava `AttributeError`, il middleware silenziava l'eccezione → licenza
+risultava inattiva.
+
+Fix: aggiunta property `_configured` a `WPLicenseClient`; aggiunto
+try/except difensivo attorno a `_validate_pro_online` in `refresh_status()`.
+
+### 3. GitHub Actions CI + Security
+
+Aggiunti: `.github/workflows/ci.yml` (pytest + PostgreSQL/Redis services, tsc,
+vite build), `.github/workflows/security.yml` (pip-audit, npm audit, Gitleaks),
+`.github/dependabot.yml` (pip/npm/actions settimanale con grouping).
 
 ---
 
 ## 2026-04-01 — Bulk status, scan import filtering, paginazione
 
-### Contesto
-Richiesta di tre funzionalità integrate:
-1. Selezione multipla + cambio status in bulk dalla tabella vulnerabilità
-2. Deselezionare uno Scan Import deve escludere le sue vulnerabilità dalla tabella
-   e dal conteggio/generazione del report
-3. Paginazione della tabella vulnerabilità
-
----
-
 ### 1. Endpoint bulk status (`PATCH /api/v1/vulnerabilities/bulk-status/`)
 
-**Scelta:** endpoint dedicato `BulkStatusUpdateView` con `PATCH` semantics.
+`BulkStatusUpdateView` con `QuerySet.update()` — O(1) query DB invece di N
+chiamate PATCH individuali. IDOR protection: filter per
+`organization=request.user.organization` prima dell'update. Limite 500 ID per
+request (`max_length=500`) per evitare query unbounded.
 
-**Motivazione:**
-- Un singolo `PATCH` con lista di ID è O(1) query sul DB grazie a `QuerySet.update()`
-  invece di N chiamate `PATCH /vulnerabilities/<pk>/` in sequenza.
-- IDOR protection: il queryset filtra `subproject__project__organization=request.user.organization`
-  prima dell'update — l'utente non può modificare vuln di altre org passando ID arbitrari.
-- Limite di 500 ID per request (`max_length=500` nel serializer) per evitare query unbounded.
-
-**Scartato:**
-- Riusare `VulnerabilityDetailView` in loop dal frontend: N round-trip HTTP, race condition,
-  e ogni chiamata recalcola i permessi individualmente.
-- Action custom su `ViewSet`: il progetto non usa ViewSet, sarebbe stato refactoring non richiesto.
-
----
+Scartato: N `PATCH /vulnerabilities/<pk>/` in loop — N round-trip, race condition.
+Scartato: action su ViewSet — il progetto non usa ViewSet.
 
 ### 2. Scan import filtering — propagazione dello stato
 
-**Scelta:** `selectedScanIds: Set<number>` in `SubProjectPage`, propagato come:
-- `disabledIds` → `VulnerabilityTable` (solo UI, nessun re-fetch)
-- `scan_import_ids` → `navigate state` → `ReportBuilderPage` → payload del report
+`selectedScanIds: Set<number>` in `SubProjectPage`, propagato come:
+- `disabledIds` → `VulnerabilityTable` (filtraggio puramente client-side,
+  nessun re-fetch)
+- `scan_import_ids` → `navigate state` → `ReportBuilderPage` → payload report
 
-**Motivazione:**
-- Nessun re-fetch: disabilitare uno scan import non deve ricaricare le vulnerabilità dal server.
-  Il filtraggio è puramente client-side sulla lista già caricata.
-- Le vuln create manualmente (`scan_import === null`) sono sempre abilitate: ha senso semantico
-  (non appartengono a nessun import, non devono mai sparire).
-- Il filtro viene passato alla generazione del report come `scan_import_ids` nel payload JSON,
-  e il generatore backend applica: `Q(scan_import__isnull=True) | Q(scan_import_id__in=ids)`.
-  Questo garantisce che anche le vuln manuali vengano incluse nel report generato.
+Generator backend: `Q(scan_import__isnull=True) | Q(scan_import_id__in=ids)` —
+le vuln create manualmente sono sempre incluse nel report.
 
-**Bug fix incluso (loose null check):**
-- `v.scan_import != null` invece di `!== null`: il check loose cattura anche `undefined`,
-  che si presentava quando il backend non era stato riavviato e il vecchio serializer non
-  restituiva il campo `scan_import`. Senza questo, tutte le vuln venivano disabilitate.
+**Bug fix — loose null check:** `v.scan_import != null` (loose) invece di
+`!== null` (strict). Il check loose cattura anche `undefined`, che si presentava
+quando il backend non era stato riavviato e il vecchio serializer non restituiva
+il campo `scan_import`. Senza questo, tutte le vuln venivano disabilitate.
 
-**Scartato:**
-- Filtrare le vuln con un query param aggiuntivo al server (es. `?scan_import=1,2,3`):
-  richiederebbe un re-fetch ogni volta che l'utente seleziona/deseleziona un import,
-  con latenza visibile e perdita della selezione precedente.
-- `deselectedScanIds` (logica invertita): meno intuitivo e richiede gestione speciale
-  dello stato iniziale "nessuno deselezionato = tutto visibile".
-
----
+Scartato: re-fetch server-side per ogni toggle scan import — latenza visibile,
+romperebbe la selezione bulk.
+Scartato: `deselectedScanIds` (logica invertita) — gestione dello stato iniziale
+più complessa.
 
 ### 3. Context menu con React Portal
 
-**Scelta:** context menu renderizzato via `createPortal(…, document.body)` con `position: fixed`.
+`createPortal(…, document.body)` con `position: fixed` + coordinate
+`clientX/clientY`. Necessario perché la tabella è dentro `overflow-x-auto`:
+un elemento `position: absolute` figlio verrebbe clippato.
 
-**Motivazione:**
-- La tabella è dentro `overflow-x-auto`. Un elemento `position: absolute` figlio di un
-  ancestor con `overflow` sarebbe stato clippato. Il portal monta il menu direttamente su
-  `<body>`, fuori dal contesto di overflow/stacking della tabella.
-- `position: fixed` con le coordinate `clientX/clientY` dell'evento posiziona il menu
-  esattamente dove ha cliccato l'utente, indipendentemente dallo scroll della pagina.
+Comportamento right-click: se la riga è selezionata → applica a tutti i
+selezionati; se non selezionata → seleziona quella e applica solo ad essa;
+righe disabilitate → nessuna azione.
 
-**Comportamento right-click:**
-- Se la riga è già selezionata: l'azione si applica a tutti i selezionati.
-- Se la riga non è selezionata: si seleziona quella singola riga e l'azione si applica ad essa.
-- Le righe disabilitate (scan import deselezionato): nessuna azione (guard `if (disabledIds?.has(vuln.id)) return`).
-
-**Scartato:**
-- Menu dropdown inline nella riga: clippato da `overflow-x-auto`.
-- Toolbar fissa in cima alla tabella: nasconde il contesto (non sai su cosa stai agendo).
-
----
+Scartato: menu dropdown inline nella riga — clippato da `overflow-x-auto`.
+Scartato: toolbar fissa — nasconde il contesto.
 
 ### 4. Paginazione client-side
 
-**Scelta:** paginazione client-side nella `VulnerabilityTable` con selector 10 / 25 / 50 / All.
-Default 25 righe. Navigazione con numeri di pagina + ellissi per set grandi (finestra di ±2
-pagine attorno alla corrente).
+Selector 10 / 25 / 50 / All, default 25. Navigazione con numeri di pagina e
+ellissi (finestra ±2 attorno alla corrente). Reset automatico a pagina 1 su
+cambio sort o lunghezza dati.
 
-**Motivazione:**
-- Le vulnerabilità sono già tutte in memoria (l'API le restituisce tutte filtrate per subproject).
-  La paginazione server-side aggiungerebbe complessità (cursori, stati di loading intermedi)
-  senza beneficio reale per dataset tipici di un subproject (decine/centinaia di vuln).
-- `useMemo` per lo slice evita ricalcoli inutili.
-- Reset automatico a pagina 1 su cambio sort o cambio dati (via `useEffect` su `sorted.length`
-  e `sortKey/sortDir`).
-
-**Scartato:**
-- Paginazione server-side: overkill per il volume atteso, e romperebbe la selezione bulk
-  (non puoi selezionare "tutti" se le vuln arrivano in pagine separate).
-- Infinite scroll / virtual list: complessità elevata, incompatibile con select-all e con
-  l'ordinamento client-side già presente.
+Scartato: paginazione server-side — le vuln sono già tutte in memoria, e
+romperebbe la selezione bulk (non puoi "seleziona tutti" su pagine separate).
+Scartato: virtual list — complessità elevata, incompatibile con select-all.
 
 ---
 
-## Sessioni precedenti
+## Note architetturali permanenti
 
-| Data | Argomento | File chiave |
-|---|---|---|
-| 2026-03-02 | Setup iniziale: Docker, accounts, licensing, projects, parsers, vulnerabilities, reports, frontend base | vedi MEMORY.md |
-| 2026-03-31 | Section editor, NVD enrichment fix (`cve_id` type), CI/CD, Dependabot, fix licenza `_configured` | `.github/workflows/`, `wp_license_client.py`, `management/commands/license_status.py` |
+### Jinja2 macros e template context
+Le macro definite nello stesso file template **possono** accedere alle variabili
+passate a `template.render()`. Diverso dalle macro importate da altri file
+(che non hanno accesso al context). Confermato da: `vulnerabilities`, `rpt_style`,
+`audience`, `charts`, `hosts` usati direttamente nelle macro senza passarli
+come argomenti.
+
+### `section_overrides` vs `ReportExport.options`
+`options` è il "cargo" di configurazione dell'export. Tutto ciò che configura
+COME generare il report va in `options`. I dati del report (vulnerability, host)
+vengono letti dal DB al momento della generazione. Non mescolare i due.
+
+### Parser error handling
+I parser restituiscono `[]` per input vuoti/null. Lanciano `ParserError` solo
+per formato malformato. "Nessuna vulnerability trovata" è un risultato valido,
+non un errore.
+
+### `SCANNER_OPTIONS` vs `PARSER_REGISTRY`
+Devono essere sincronizzati manualmente quando si aggiunge un parser. Non esiste
+un endpoint che espone i parser disponibili. Considerare di aggiungerne uno se
+la lista supera 50 entry o si implementa un meccanismo di plugin.
+
+### `scan_import` field nei serializer
+`VulnerabilityListSerializer` include `scan_import` (aggiunto il 2026-04-01).
+Se il backend non è riavviato dopo la modifica, il campo non è presente nella
+risposta e il client riceve `undefined` — proteggersi con `!= null` (loose).
