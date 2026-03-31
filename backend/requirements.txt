@@ -1,8 +1,8 @@
 # Django core
-Django==5.1.15
-djangorestframework==3.15.2
-django-cors-headers==4.3.1
-django-filter==24.2
+Django==6.0.3
+djangorestframework==3.17.1
+django-cors-headers==4.9.0
+django-filter==25.2
 
 # Authentication & Security
 djangorestframework-simplejwt==5.5.1
@@ -20,8 +20,8 @@ channels-redis==4.2.1
 # Task queue
 celery==5.4.0
 redis==5.2.1
-django-celery-beat==2.7.0
-django-celery-results==2.5.1
+django-celery-beat==2.9.0
+django-celery-results==2.6.0
 
 # File processing & validation
 python-magic==0.4.27
@@ -42,12 +42,12 @@ pandas==2.2.3
 kaleido==0.2.1
 
 # Email
-django-anymail==12.0
+django-anymail==14.0
 
 # Utils
 python-decouple==3.8
 python-json-logger==3.2.1
-django-extensions==3.2.3
+django-extensions==4.1
 django-storages==1.14.6
 
 # NVD Enrichment
