@@ -12,8 +12,6 @@ from __future__ import annotations
 
 from cyberreport_pro_parsers.parsers.canonical_schema import (
     ScanImportResult,
-    NormalizedVulnerability as L2Vuln,
-    Severity,
 )
 from apps.vulnerabilities.deduplication import NormalizedVulnerability as L1Vuln
 

@@ -1,6 +1,7 @@
 """CyberReport Pro — Canonical Vulnerability Schema v2"""
 from __future__ import annotations
-import hashlib, re
+import hashlib
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum

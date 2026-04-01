@@ -125,7 +125,7 @@ class WapitiParser(BaseParser):
                     if http_req:
                         evidence += f"\n\nRequest:\n{http_req}"
                     if ref_parts:
-                        evidence += f"\n\nReferences:\n" + "\n".join(ref_parts[:3])
+                        evidence += "\n\nReferences:\n" + "\n".join(ref_parts[:3])
 
                     results.append(NormalizedVulnerability(
                         title=title,

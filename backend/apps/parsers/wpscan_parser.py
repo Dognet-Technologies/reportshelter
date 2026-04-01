@@ -77,7 +77,7 @@ def _extract_vulns(
 
         description = f"Component: {context}\nTitle: {title}"
         if ref_urls:
-            description += f"\nReferences:\n" + "\n".join(ref_urls[:3])
+            description += "\nReferences:\n" + "\n".join(ref_urls[:3])
 
         results.append(NormalizedVulnerability(
             title=full_title,

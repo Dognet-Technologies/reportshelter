@@ -26,7 +26,6 @@ Severity 1=info, 2=low, 3=medium, 4=high, 5=critical.
 from __future__ import annotations
 
 import logging
-import re
 import xml.etree.ElementTree as ET
 from typing import IO
 from urllib.parse import urlparse

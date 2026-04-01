@@ -10,7 +10,6 @@ This migration records the AlterField so Django's internal state matches the mod
 eliminating the spurious warning.  No SQL is executed against the database.
 """
 
-import django.db.models
 from django.db import migrations, models
 
 

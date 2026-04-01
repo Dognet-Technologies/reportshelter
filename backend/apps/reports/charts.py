@@ -18,7 +18,6 @@ from collections import Counter, defaultdict
 
 import matplotlib
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
 import numpy as np
 
 matplotlib.use("Agg")  # Non-interactive backend (no display required)

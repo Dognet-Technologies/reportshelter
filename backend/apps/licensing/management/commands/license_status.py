@@ -9,7 +9,7 @@ Usage:
 
 from __future__ import annotations
 
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import BaseCommand
 from django.utils import timezone
 
 
@@ -74,7 +74,7 @@ class Command(BaseCommand):
                 lic.integrity_hash = ""
                 lic.save()
                 self.stdout.write(self.style.WARNING(
-                    f"  → Reset to TRIAL_ACTIVE (dev fix)"
+                    "  → Reset to TRIAL_ACTIVE (dev fix)"
                 ))
 
         self.stdout.write("\n── End ─────────────────────────────────────────\n")

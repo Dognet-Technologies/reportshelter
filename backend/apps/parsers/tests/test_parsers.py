@@ -17,7 +17,6 @@ from apps.parsers.nmap_parser import NmapParser
 from apps.parsers.openvas_parser import NessusParser, OpenVasParser
 from apps.parsers.registry import PARSER_REGISTRY, get_parser
 from apps.parsers.zap_parser import ZAPParser
-from apps.vulnerabilities.deduplication import NormalizedVulnerability
 
 # ---------------------------------------------------------------------------
 # Fixture XML strings

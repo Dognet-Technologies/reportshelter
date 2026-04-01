@@ -3,7 +3,6 @@ Base Django settings for CyberReport Pro.
 All environment-specific settings go in dev.py or prod.py.
 """
 
-import os
 from pathlib import Path
 
 from decouple import Csv, config

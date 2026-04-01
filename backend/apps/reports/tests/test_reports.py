@@ -7,7 +7,6 @@ WeasyPrint (PDF) is mocked to avoid requiring a browser-rendering engine
 in the test environment.
 """
 
-import io
 import xml.etree.ElementTree as ET
 from unittest.mock import MagicMock, patch
 

@@ -4,7 +4,6 @@ Views for the reports app.
 
 from __future__ import annotations
 
-import http
 
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404

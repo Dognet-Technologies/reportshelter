@@ -1,7 +1,7 @@
 """Test suite BurpParser — basata su file reali."""
 import pytest
 from pathlib import Path
-from burp_parser import BurpParser, strip_html, extract_cwe_ids, extract_reference_urls, parse_host, xml11_to_xml10
+from burp_parser import BurpParser, strip_html, extract_cwe_ids, parse_host, xml11_to_xml10
 from canonical_schema import Severity, EnrichmentStatus
 
 SAMPLES = Path('/mnt/user-data/uploads')

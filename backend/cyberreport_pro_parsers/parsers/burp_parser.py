@@ -75,7 +75,6 @@ import html
 import logging
 import re
 import xml.etree.ElementTree as ET
-from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -384,7 +383,7 @@ class BurpParser(BaseParser):
 
         try:
             root = ET.fromstring(source)
-        except ET.ParseError as e:
+        except ET.ParseError:
             # Tentativo di recupero: rimuovi DOCTYPE per parser più permissivo
             cleaned = re.sub(rb'<!DOCTYPE[^>]*>', b'', source, flags=re.DOTALL)
             cleaned = re.sub(rb'<!ELEMENT[^>]*>', b'', cleaned)
@@ -563,7 +562,7 @@ class BurpParser(BaseParser):
             if type_el is not None and type_el.text:
                 pp_parts.append(f"Type: {type_el.text.strip()}")
             if pp_parts:
-                extra_evidence_parts.append(f"[Prototype Pollution]\n" + "\n".join(pp_parts))
+                extra_evidence_parts.append("[Prototype Pollution]\n" + "\n".join(pp_parts))
 
         if extra_evidence_parts:
             if evidence:

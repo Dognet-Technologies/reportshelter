@@ -168,6 +168,5 @@ class TestAutoDetect:
         assert len(r.vulnerabilities) == 166
 
     def test_invalid_raises(self):
-        import pytest
         with pytest.raises((ValueError, Exception)):
             detect_and_parse(b'random garbage that is not xml or csv')

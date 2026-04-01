@@ -10,7 +10,6 @@ from rest_framework.test import APIClient
 
 from apps.accounts.models import (
     AuditLog,
-    LoginAttempt,
     Organization,
     PasswordResetToken,
     User,

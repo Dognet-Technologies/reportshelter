@@ -12,7 +12,6 @@ from pathlib import Path
 
 from django.conf import settings
 from django.db import models
-from django.template.loader import render_to_string
 
 from apps.vulnerabilities.deduplication import build_timeline
 from apps.vulnerabilities.models import RISK_LEVEL_ORDER, Vulnerability

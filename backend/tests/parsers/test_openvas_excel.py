@@ -10,8 +10,6 @@ Per ottenerlo:
 I test di unità (magic bytes, file vuoto) non richiedono la fixture.
 """
 import io
-import struct
-import zipfile
 
 import pytest
 from pathlib import Path

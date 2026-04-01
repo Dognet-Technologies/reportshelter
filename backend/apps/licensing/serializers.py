@@ -4,7 +4,7 @@ import re
 
 from rest_framework import serializers
 
-from .models import License, LicenseStatus
+from .models import License
 
 # RS-XXXX-XXXX-XXXX-XXXX  (case-insensitive, alphanumeric chunks)
 _LICENSE_KEY_RE = re.compile(r"^RS-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$", re.IGNORECASE)
