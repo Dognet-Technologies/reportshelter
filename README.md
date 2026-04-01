@@ -1,6 +1,32 @@
-# ReportShelter PRO
+## ReportShelter PRO
 
-Strumento web per la creazione di report di cybersecurity professionali destinati a pentesters e consulenti di sicurezza. Permette di importare output da scanner (Nmap, Burp, ZAP, Nikto, Metasploit, OpenVAS, Nessus), elaborare vulnerabilità e generare report in PDF, HTML o XML.
+Strumento web per la creazione di report di cybersecurity professionali destinati a pentesters e consulenti di sicurezza. Permette di importare output da scanner, elaborare vulnerabilità e generare report 
+in PDF, HTML o XML.
+
+# La lista dei tool per ora supportati sono:
+
+acunetix              gitlab_container		
+redhatsatellite	      gitleaks
+hydra                 immuniweb
+arachni               sonarqube
+aws_inspector2        metasploit 
+ssh_audit             awssecurityhub
+sslscan		      sysdig
+burp                  netsparker
+cargo_audit           nexpose
+cloudsploit           nikto
+trivyc		      cobalt
+nmap		      codechecker
+nuclei		      csv_generic
+openvas               wapiti
+cycognito	      wfuzz
+dockerbench           qualys
+wpscan                github_vulnerability
+qualys_webapp         zap
+
+PROSSIMI PARSER:
+Application_traceroute/SmartCrawler
+Wendy
 
 ---
 
