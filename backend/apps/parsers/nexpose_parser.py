@@ -135,9 +135,9 @@ class NexposeParser(BaseParser):
             if status not in ("alive", "dead", ""):
                 continue
 
-            os_vendor = ""
+            _os_vendor = ""
             for fp in node.iter("os"):
-                os_vendor = fp.get("product") or fp.get("vendor") or ""
+                _os_vendor = fp.get("product") or fp.get("vendor") or ""
                 break
 
             def _add_test_findings(test_el: ET.Element, port: int | None, service: str) -> None:

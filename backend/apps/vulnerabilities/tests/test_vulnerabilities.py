@@ -4,11 +4,9 @@ Covers: Vulnerability model, ScanImport, deduplication, diff, timeline, risk sco
 """
 
 import pytest
-from django.utils import timezone
 
 from apps.vulnerabilities.deduplication import (
     NormalizedVulnerability,
-    VulnDiff,
     build_timeline,
     compute_diff,
     deduplicate_and_save,
@@ -317,9 +315,9 @@ class TestTimeline:
     def test_timeline_ordered_by_scan_date(self, project, admin_user):
         from apps.projects.models import SubProject
         from datetime import date
-        sp1 = SubProject.objects.create(project=project, created_by=admin_user, title="SP1", scan_date=date(2025, 1, 1))
-        sp2 = SubProject.objects.create(project=project, created_by=admin_user, title="SP2", scan_date=date(2025, 3, 1))
-        sp3 = SubProject.objects.create(project=project, created_by=admin_user, title="SP3", scan_date=date(2025, 2, 1))
+        SubProject.objects.create(project=project, created_by=admin_user, title="SP1", scan_date=date(2025, 1, 1))
+        SubProject.objects.create(project=project, created_by=admin_user, title="SP2", scan_date=date(2025, 3, 1))
+        SubProject.objects.create(project=project, created_by=admin_user, title="SP3", scan_date=date(2025, 2, 1))
         timeline = build_timeline(project.pk)
         dates = [t["scan_date"] for t in timeline]
         assert dates == sorted(dates)

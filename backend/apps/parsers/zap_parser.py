@@ -68,7 +68,7 @@ class ZAPParser(BaseParser):
                 risk_code = alert.findtext("riskcode", "0").strip()
                 confidence = alert.findtext("confidence", "").strip()
                 cwe_id = alert.findtext("cweid", "").strip()
-                wascid = alert.findtext("wascid", "").strip()
+                _wascid = alert.findtext("wascid", "").strip()
                 evidence = alert.findtext("evidence", "").strip()
                 reference = alert.findtext("reference", "").strip()
 
@@ -86,7 +86,7 @@ class ZAPParser(BaseParser):
                 # Collect all URIs for this alert
                 uris = [uri.findtext("uri", "") for uri in alert.findall(".//uri")]
                 if uris:
-                    evidence_text += f"\nURLs:\n" + "\n".join(uris[:10])
+                    evidence_text += "\nURLs:\n" + "\n".join(uris[:10])
 
                 results.append(NormalizedVulnerability(
                     title=f"ZAP: {name}",

@@ -1,0 +1,20 @@
+# Ruff configuration for Shelter backend.
+# CI enforces only rules that catch real bugs (F-rules + E9xx syntax errors).
+# Style formatting (E1xx-E7xx) is delegated to black/isort and not enforced here
+# to avoid blocking CI on pre-existing style debt.
+
+[lint]
+# F = Pyflakes (unused imports, undefined names, etc.)
+# E9 = Syntax errors caught by pycodestyle (always fatal)
+select = ["F", "E9"]
+
+# Per-file ignores for legitimate patterns.
+[lint.per-file-ignores]
+# E402: base64 import mid-module is intentional (runtime obfuscation of contact string).
+# F821: string forward-references in type annotations are false positives.
+"apps/licensing/models.py" = ["E402", "F821"]
+# Test files often import symbols only used indirectly (pytest fixtures, etc.).
+"**/tests/**" = ["F401", "F811"]
+"tests/**" = ["F401", "F811"]
+# Parser canonical schema uses compact multi-line style intentionally.
+"cyberreport_pro_parsers/**" = ["F841"]

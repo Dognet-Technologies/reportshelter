@@ -254,7 +254,7 @@ class TestProjectLock:
         assert response.status_code == status.HTTP_200_OK
 
     def test_heartbeat(self, auth_client: APIClient, project: Project, admin_user: User) -> None:
-        lock = ProjectLock.objects.create(project=project, locked_by=admin_user)
+        ProjectLock.objects.create(project=project, locked_by=admin_user)
         url = reverse("projects:lock-heartbeat", kwargs={"pk": project.pk})
         response = auth_client.post(url)
         assert response.status_code == status.HTTP_200_OK

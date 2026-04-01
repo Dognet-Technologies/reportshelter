@@ -153,7 +153,7 @@ class SysdigParser(BaseParser):
             cve_id = (item.get("vuln") or item.get("cve") or item.get("id") or "").strip()
             severity = _sev(item.get("severity") or "")
             pkg_name = item.get("packageName") or item.get("package") or ""
-            pkg_version = item.get("packageVersion") or item.get("version") or ""
+            _pkg_version = item.get("packageVersion") or item.get("version") or ""
             cvss_score = item.get("cvssScore") or item.get("score")
             fix_version = item.get("fixedVersion") or item.get("fix") or ""
             description = item.get("description") or f"CVE: {cve_id} in {pkg_name}"
