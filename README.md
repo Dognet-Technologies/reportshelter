@@ -40,6 +40,14 @@ EMAIL_HOST_USER=noreply@example.com
 EMAIL_HOST_PASSWORD=password
 ```
 
+Per generare una `SECRET_KEY` sicura:
+
+```bash
+python3 -c "import secrets; print(secrets.token_hex(50))"
+# oppure
+openssl rand -hex 50
+```
+
 > **Nota:** Il file `.env` non viene mai committato. Non condividerlo.
 
 ### 3. Avvia i container
@@ -150,6 +158,37 @@ Vedi `.env.example` per l'elenco completo. Le principali:
 | `EMAIL_HOST` | SMTP server per email | `smtp.example.com` |
 | `VITE_API_BASE_URL` | URL base API per il frontend | `http://localhost:8000/api/v1` |
 | `WP_LICENSE_API_URL` | URL WordPress License Manager | placeholder |
+
+---
+
+## Troubleshooting
+
+**`No matching distribution found for Django==6.0.3`**
+Django 6 richiede Python ≥ 3.12. Il Dockerfile usa già `python:3.12-slim` — se hai un'immagine cached precedente, forza il rebuild:
+```bash
+docker compose build --no-cache
+```
+
+**`celery_beat` si avvia e crasha in loop**
+Celery Beat usa `DatabaseScheduler`, che richiede le tabelle create dalle migrazioni Django. Assicurati di usare la versione aggiornata del `docker-compose.yml` (celery_beat dipende da `backend: service_healthy`).
+
+**Errore PostCSS / Tailwind al primo avvio del frontend**
+Se vedi errori su `@tailwindcss/postcss`, il `package-lock.json` potrebbe essere obsoleto. Rigeneralo con:
+```bash
+docker run --rm -v $(pwd)/frontend:/app -w /app node:20-alpine npm install
+```
+Poi rebuilda: `docker compose build frontend`
+
+**`npm ci` fallisce con errore di lock file**
+Stesso problema del punto sopra: `package.json` e `package-lock.json` non sono in sync. Rigenera il lock file come indicato sopra.
+
+**Il DB non si avvia / password errata**
+Se hai già avviato i container in precedenza con una password diversa, il volume Postgres conserva quella vecchia. Per ripartire da zero:
+```bash
+docker compose down -v
+docker compose up --build
+```
+> Attenzione: `-v` cancella tutti i dati del database.
 
 ---
 
