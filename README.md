@@ -172,7 +172,10 @@ docker compose build --no-cache
 **`celery_beat` si avvia e crasha in loop**
 Celery Beat usa `DatabaseScheduler`, che richiede le tabelle create dalle migrazioni Django. Assicurati di usare la versione aggiornata del `docker-compose.yml` (celery_beat dipende da `backend: service_healthy`).
 
-**Errore PostCSS / Tailwind al primo avvio del frontend**
+**`Cannot apply unknown utility class` / errori Tailwind CSS**
+In Tailwind v4 la sintassi `@tailwind base/components/utilities` non esiste più — è già corretta in `src/index.css` con `@import "tailwindcss"`. Se hai una copia locale modificata, aggiornala.
+
+**Errore PostCSS / `@tailwindcss/postcss`**
 Se vedi errori su `@tailwindcss/postcss`, il `package-lock.json` potrebbe essere obsoleto. Rigeneralo con:
 ```bash
 docker run --rm -v $(pwd)/frontend:/app -w /app node:20-alpine npm install
