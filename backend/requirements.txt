@@ -29,7 +29,7 @@ pillow==12.1.1
 openpyxl==3.1.5
 
 # PDF generation
-weasyprint==68.0
+weasyprint==68.1
 reportlab==4.2.5
 
 # Templating
