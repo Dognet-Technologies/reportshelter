@@ -60,6 +60,10 @@ cover/
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
+backend/static/admin/
+
+# Frontend
+frontend/node_modules/
 
 # Flask stuff:
 instance/
@@ -207,3 +211,4 @@ marimo/_lsp/
 __marimo__/
 Immagini/*
 .github/*
+backend/static/admin/

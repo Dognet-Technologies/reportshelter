@@ -13,8 +13,8 @@ django-ratelimit==4.1.0
 psycopg2-binary==2.9.10
 
 # Async / WebSocket
-daphne==4.1.2
-channels==4.2.0
+daphne==4.2.1
+channels==4.3.2
 channels-redis==4.2.1
 
 # Task queue
@@ -25,11 +25,11 @@ django-celery-results==2.6.0
 
 # File processing & validation
 python-magic==0.4.27
-pillow==12.1.1
+pillow==12.2.0
 openpyxl==3.1.5
 
 # PDF generation
-weasyprint==68.0
+weasyprint==68.1
 reportlab==4.2.5
 
 # Templating
@@ -54,7 +54,7 @@ django-storages==1.14.6
 nvdlib>=0.7.6
 
 # Testing
-pytest==8.1.1
+pytest==9.0.2
 pytest-django==4.8.0
 pytest-cov==5.0.0
 factory-boy==3.3.3
