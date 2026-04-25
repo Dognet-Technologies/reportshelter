@@ -89,49 +89,85 @@ const AUDIENCE_LABELS: Record<string, string> = {
 };
 const CLASSIFICATION_LEVELS = ["PUBLIC","INTERNAL","CONFIDENTIAL","RESTRICTED","TOP SECRET"];
 const METHODOLOGIES = ["OWASP Testing Guide","PTES","OSSTMM","NIST SP 800-115","NIST CSF","ISO 27001","MITRE ATT&CK","TIBER-EU","DORA"];
-const SCANNER_OPTIONS = [
-  // ── Original ─────────────────────────────────────────────
-  { value: "nmap",                label: "Nmap (XML)" },
-  { value: "nikto",               label: "Nikto (XML)" },
-  { value: "burp",                label: "Burp Suite (XML)" },
-  { value: "zap",                 label: "OWASP ZAP (XML/JSON)" },
-  { value: "metasploit",          label: "Metasploit (XML)" },
-  { value: "openvas",             label: "OpenVAS / Greenbone (XML/CSV)" },
-  { value: "nessus",              label: "Nessus (CSV)" },
-  { value: "csv",                 label: "Generic CSV" },
-  // ── Cloud & Infrastructure ────────────────────────────────
-  { value: "aws_inspector2",      label: "AWS Inspector v2 (JSON)" },
-  { value: "awssecurityhub",      label: "AWS Security Hub (JSON)" },
-  { value: "cloudsploit",         label: "CloudSploit (JSON)" },
-  { value: "dockerbench",         label: "Docker Bench Security (JSON)" },
-  { value: "nexpose",             label: "Nexpose / InsightVM (XML)" },
-  { value: "qualys",              label: "Qualys Infrastructure (CSV/XML)" },
-  { value: "qualys_webapp",       label: "Qualys Web App Scanner (XML)" },
-  { value: "redhatsatellite",     label: "Red Hat Satellite (JSON)" },
-  { value: "sysdig",              label: "Sysdig (JSON/CSV)" },
-  { value: "trivy",               label: "Trivy (JSON)" },
-  // ── Web & Application ─────────────────────────────────────
-  { value: "acunetix",            label: "Acunetix / Acunetix 360 (XML/JSON)" },
-  { value: "arachni",             label: "Arachni (JSON)" },
-  { value: "immuniweb",           label: "ImmuniWeb (JSON/XML)" },
-  { value: "netsparker",          label: "Netsparker / Invicti (JSON)" },
-  { value: "nuclei",              label: "Nuclei (JSON/JSONL)" },
-  { value: "sslscan",             label: "SSLScan (XML)" },
-  { value: "wapiti",              label: "Wapiti (XML)" },
-  { value: "wfuzz",               label: "WFuzz (JSON)" },
-  { value: "wpscan",              label: "WPScan (JSON)" },
-  // ── Code & Secret Scanning ────────────────────────────────
-  { value: "cargo_audit",         label: "Cargo Audit (JSON)" },
-  { value: "codechecker",         label: "CodeChecker (JSON)" },
-  { value: "gitleaks",            label: "Gitleaks (JSON)" },
-  { value: "github_vulnerability",label: "GitHub Security Alerts (JSON)" },
-  { value: "gitlab_container_scan",label:"GitLab Container Scan (JSON)" },
-  { value: "sonarqube",           label: "SonarQube (JSON)" },
-  // ── Network & Credential ──────────────────────────────────
-  { value: "cobalt",              label: "Cobalt.io (CSV)" },
-  { value: "cycognito",           label: "CyCognito (JSON)" },
-  { value: "hydra",               label: "Hydra (JSON)" },
-  { value: "ssh_audit",           label: "ssh-audit (JSON)" },
+const SCANNER_GROUPS: { group: string; options: { value: string; label: string }[] }[] = [
+  {
+    group: "OSINT & Attack Surface",
+    options: [
+      { value: "pentest_pipeline", label: "Pentest Pipeline Report (MD)" },
+      { value: "cycognito",        label: "CyCognito (JSON)" },
+    ],
+  },
+  {
+    group: "Discovery & Fingerprinting",
+    options: [
+      { value: "nmap",             label: "Nmap (XML)" },
+      { value: "nikto",            label: "Nikto (XML)" },
+      { value: "ssh_audit",        label: "ssh-audit (JSON)" },
+      { value: "sslscan",          label: "SSLScan (XML)" },
+    ],
+  },
+  {
+    group: "Web Application",
+    options: [
+      { value: "burp",             label: "Burp Suite (XML)" },
+      { value: "zap",              label: "OWASP ZAP (XML/JSON)" },
+      { value: "acunetix",         label: "Acunetix / Acunetix 360 (XML/JSON)" },
+      { value: "arachni",          label: "Arachni (JSON)" },
+      { value: "immuniweb",        label: "ImmuniWeb (JSON/XML)" },
+      { value: "netsparker",       label: "Netsparker / Invicti (JSON)" },
+      { value: "wapiti",           label: "Wapiti (XML)" },
+      { value: "wfuzz",            label: "WFuzz (JSON)" },
+      { value: "wpscan",           label: "WPScan (JSON)" },
+    ],
+  },
+  {
+    group: "Vulnerability Assessment",
+    options: [
+      { value: "openvas",          label: "OpenVAS / Greenbone (XML/CSV)" },
+      { value: "nessus",           label: "Nessus (CSV)" },
+      { value: "nexpose",          label: "Nexpose / InsightVM (XML)" },
+      { value: "qualys",           label: "Qualys Infrastructure (CSV/XML)" },
+      { value: "qualys_webapp",    label: "Qualys Web App Scanner (XML)" },
+      { value: "nuclei",           label: "Nuclei (JSON/JSONL)" },
+    ],
+  },
+  {
+    group: "Cloud & Infrastructure",
+    options: [
+      { value: "aws_inspector2",   label: "AWS Inspector v2 (JSON)" },
+      { value: "awssecurityhub",   label: "AWS Security Hub (JSON)" },
+      { value: "cloudsploit",      label: "CloudSploit (JSON)" },
+      { value: "dockerbench",      label: "Docker Bench Security (JSON)" },
+      { value: "redhatsatellite",  label: "Red Hat Satellite (JSON)" },
+      { value: "sysdig",           label: "Sysdig (JSON/CSV)" },
+      { value: "trivy",            label: "Trivy (JSON)" },
+    ],
+  },
+  {
+    group: "Code & Secret Scanning",
+    options: [
+      { value: "cargo_audit",          label: "Cargo Audit (JSON)" },
+      { value: "codechecker",          label: "CodeChecker (JSON)" },
+      { value: "gitleaks",             label: "Gitleaks (JSON)" },
+      { value: "github_vulnerability", label: "GitHub Security Alerts (JSON)" },
+      { value: "gitlab_container_scan",label: "GitLab Container Scan (JSON)" },
+      { value: "sonarqube",            label: "SonarQube (JSON)" },
+    ],
+  },
+  {
+    group: "Exploit Frameworks & Credential",
+    options: [
+      { value: "metasploit",       label: "Metasploit (XML)" },
+      { value: "hydra",            label: "Hydra (JSON)" },
+      { value: "cobalt",           label: "Cobalt.io (CSV)" },
+    ],
+  },
+  {
+    group: "Generic",
+    options: [
+      { value: "csv",              label: "Generic CSV" },
+    ],
+  },
 ];
 
 // ─── Config State Defaults ────────────────────────────────────────────────────
@@ -531,7 +567,11 @@ function ScansPanel({ subprojectId, selectedScanIds, onSelectionChange, canImpor
         <div className="mb-3">
           <label className="label">Scanner type</label>
           <select value={scannerType} onChange={(e) => setScannerType(e.target.value)} className="input w-full" disabled={!canImport}>
-            {SCANNER_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            {SCANNER_GROUPS.map((g) => (
+              <optgroup key={g.group} label={g.group}>
+                {g.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </optgroup>
+            ))}
           </select>
         </div>
         <div {...getRootProps()} className={`rounded-lg border-2 border-dashed p-6 text-center cursor-pointer transition-colors ${

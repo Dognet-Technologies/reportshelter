@@ -312,6 +312,9 @@
         {% elif sid == 'detection_gap'          %}<li>Detection Gap Analysis</li>
         {% elif sid == 'cloud_posture_overview' %}<li>Cloud Posture Overview</li>
         {% elif sid == 'network_overview'       %}<li>Network Overview</li>
+        {% elif sid == 'passive_recon'          %}<li>Passive Reconnaissance</li>
+        {% elif sid == 'web_surface'            %}<li>Web Attack Surface</li>
+        {% elif sid == 'content_discovery'      %}<li>Content Discovery</li>
         {% elif sid == 'recommendations'        %}<li>Recommendations</li>
         {% elif sid == 'appendix'               %}<li>Appendices</li>
         {% endif %}
@@ -874,6 +877,84 @@
   </div>
   {% endmacro %}
 
+  {# ── Passive Reconnaissance ── #}
+  {% macro mac_passive_recon() %}
+  <div class="page-break">
+    <h2>Passive Reconnaissance</h2>
+    {{ _ci('passive_recon') }}
+    <p>Passive OSINT findings collected without direct interaction with target systems: subdomains, DNS profile, ASN/IP ranges, certificate transparency logs, and Shodan exposure.</p>
+    <table class="vuln-table">
+      <thead><tr><th>Finding</th><th>Host</th><th>Severity</th><th>Detail</th></tr></thead>
+      <tbody>
+        {% for v in vulnerabilities if v.category == "Passive Recon" %}
+        <tr>
+          <td>{{ v.title[:80] }}</td>
+          <td style="font-size:8pt;">{{ v.affected_host or "—" }}</td>
+          <td><span class="badge badge-{{ v.risk_level }}">{{ v.risk_level|upper }}</span></td>
+          <td style="font-size:8pt;color:#374151;">{{ (v.description or "")[:200] or "—" }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" style="color:#6b7280;font-style:italic;">No passive reconnaissance data recorded. Import the pipeline report.md via the Pentest Pipeline parser.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endmacro %}
+
+  {# ── Web Attack Surface ── #}
+  {% macro mac_web_surface() %}
+  <div class="page-break">
+    <h2>Web Attack Surface</h2>
+    {{ _ci('web_surface') }}
+    <p>Live web assets, technology stack fingerprinting, security header audit, and WAF detection results.</p>
+    {% set _ws_cats = ["Web Surface", "Security Headers", "WAF Detection"] %}
+    <table class="vuln-table">
+      <thead><tr><th>Finding</th><th>Host</th><th>Category</th><th>Severity</th></tr></thead>
+      <tbody>
+        {% for v in vulnerabilities if v.category in _ws_cats %}
+        <tr>
+          <td>{{ v.title[:80] }}</td>
+          <td style="font-size:8pt;">{{ v.affected_host or "—" }}{% if v.affected_port %}:{{ v.affected_port }}{% endif %}</td>
+          <td style="font-size:8pt;">{{ v.category }}</td>
+          <td><span class="badge badge-{{ v.risk_level }}">{{ v.risk_level|upper }}</span></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" style="color:#6b7280;font-style:italic;">No web surface data recorded. Import the pipeline report.md via the Pentest Pipeline parser.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% if charts.vulns_by_category %}
+    <div class="chart-full" style="margin-top:16px;">
+      <img class="chart-img" src="data:image/png;base64,{{ charts.vulns_by_category }}" />
+    </div>
+    {% endif %}
+  </div>
+  {% endmacro %}
+
+  {# ── Content Discovery ── #}
+  {% macro mac_content_discovery() %}
+  <div class="page-break">
+    <h2>Content Discovery</h2>
+    {{ _ci('content_discovery') }}
+    <p>Discovered paths, administration interfaces, API endpoints, backup files, and potential secrets found in JavaScript files.</p>
+    <table class="vuln-table">
+      <thead><tr><th>Finding</th><th>Host</th><th>Severity</th><th>Detail</th></tr></thead>
+      <tbody>
+        {% for v in vulnerabilities if v.category == "Content Discovery" %}
+        <tr>
+          <td>{{ v.title[:80] }}</td>
+          <td style="font-size:8pt;">{{ v.affected_host or "—" }}</td>
+          <td><span class="badge badge-{{ v.risk_level }}">{{ v.risk_level|upper }}</span></td>
+          <td style="font-size:8pt;color:#374151;">{{ (v.description or "")[:200] or "—" }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" style="color:#6b7280;font-style:italic;">No content discovery data recorded. Import the pipeline report.md via the Pentest Pipeline parser.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endmacro %}
+
   {# ── OWASP Coverage ── #}
   {% macro mac_owasp_coverage() %}
   <div class="page-break">
@@ -1172,6 +1253,9 @@
     {% elif sec_id == 'detection_gap'         %}{{ mac_detection_gap() }}
     {% elif sec_id == 'cloud_posture_overview'%}{{ mac_cloud_posture_overview() }}
     {% elif sec_id == 'network_overview'      %}{{ mac_network_overview() }}
+    {% elif sec_id == 'passive_recon'         %}{{ mac_passive_recon() }}
+    {% elif sec_id == 'web_surface'           %}{{ mac_web_surface() }}
+    {% elif sec_id == 'content_discovery'     %}{{ mac_content_discovery() }}
     {% elif sec_id == 'recommendations'       %}{{ mac_recommendations() }}
     {% elif sec_id == 'appendix'              %}{{ mac_appendix() }}
     {% endif %}

@@ -59,6 +59,7 @@ REPORT_TYPE_LABELS: dict[str, str] = {
     "forensic":       "Forensic Investigation Report",
     "malware":        "Malware Analysis Report",
     "lessons_learned":"Post-Incident Lessons Learned",
+    "attack_surface": "Attack Surface Assessment",
 }
 
 # All known section IDs — used as fallback when sections list is empty.
@@ -76,6 +77,7 @@ ALL_SECTIONS: set[str] = {
     "osint_findings", "digital_footprint", "credential_exposure",
     "owasp_coverage", "masvs_coverage", "mitre_mapping", "detection_gap",
     "cloud_posture_overview", "network_overview",
+    "passive_recon", "web_surface", "content_discovery",
     "recommendations", "appendix",
 }
 

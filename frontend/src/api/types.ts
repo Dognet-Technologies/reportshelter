@@ -174,7 +174,14 @@ export interface TimelinePoint {
 
 // ─── Scan Imports ────────────────────────────────────────────────────────────
 
-export type ScanTool = "nmap" | "nikto" | "burp" | "zap" | "metasploit" | "csv" | "unknown";
+export type ScanTool =
+  | "nmap" | "nikto" | "ssh_audit" | "sslscan" | "cycognito" | "pentest_pipeline"
+  | "burp" | "zap" | "acunetix" | "arachni" | "immuniweb" | "netsparker" | "wapiti" | "wfuzz" | "wpscan"
+  | "openvas" | "nessus" | "nexpose" | "qualys" | "qualys_webapp" | "nuclei"
+  | "aws_inspector2" | "awssecurityhub" | "cloudsploit" | "dockerbench" | "redhatsatellite" | "sysdig" | "trivy"
+  | "cargo_audit" | "codechecker" | "gitleaks" | "github_vulnerability" | "gitlab_container_scan" | "sonarqube"
+  | "metasploit" | "hydra" | "cobalt"
+  | "csv" | "unknown";
 export type ImportStatus = "pending" | "processing" | "done" | "failed";
 
 export interface ScanImport {

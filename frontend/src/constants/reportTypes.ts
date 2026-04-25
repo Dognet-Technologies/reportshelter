@@ -12,7 +12,8 @@ export type ReportTypeId =
   | "compliance" | "osint" | "executive"
   | "it_infra" | "code_review" | "arch_review" | "dr" | "it_audit"
   | "remediation" | "retest" | "risk_register" | "patch_mgmt"
-  | "breach" | "forensic" | "malware" | "lessons_learned";
+  | "breach" | "forensic" | "malware" | "lessons_learned"
+  | "attack_surface";
 
 export interface ReportTypeInfo {
   id: ReportTypeId;
@@ -37,8 +38,9 @@ export const REPORT_TYPES: ReportTypeInfo[] = [
   { id: "incident",     label: "Incident Response Report",       desc: "Post-incident: timeline, IoC, containment",     audience: ["executive","management","technical"], category: "Cybersecurity", hasVulns: false },
   { id: "threat_intel", label: "Threat Intelligence Report",     desc: "TTPs, threat actors, emerging vulns",           audience: ["management","technical"],             category: "Cybersecurity", hasVulns: false },
   { id: "compliance",   label: "Compliance Gap Assessment",      desc: "ISO 27001, NIS2, GDPR, PCI-DSS, DORA",         audience: ["executive","management"],             category: "Cybersecurity", hasVulns: true  },
-  { id: "osint",        label: "OSINT Report",                   desc: "Public exposure, digital footprint",            audience: ["management","technical"],             category: "Cybersecurity", hasVulns: false },
-  { id: "executive",    label: "Executive Summary",              desc: "Non-technical synthesis for board/management",  audience: ["executive"],                          category: "Cybersecurity", hasVulns: false },
+  { id: "osint",          label: "OSINT Report",                   desc: "Public exposure, digital footprint",                                          audience: ["management","technical"],             category: "Cybersecurity", hasVulns: false },
+  { id: "executive",      label: "Executive Summary",              desc: "Non-technical synthesis for board/management",                               audience: ["executive"],                          category: "Cybersecurity", hasVulns: false },
+  { id: "attack_surface", label: "Attack Surface Assessment",      desc: "External attack surface: hosts, services, web apps, SSL, content discovery", audience: ["executive","management","technical"],  category: "Cybersecurity", hasVulns: true  },
   // IT General
   { id: "it_infra",     label: "IT Infrastructure Assessment",   desc: "General infrastructure status",                 audience: ["management","technical"],             category: "IT General",    hasVulns: true  },
   { id: "code_review",  label: "Code Review Report",             desc: "Static code analysis findings",                 audience: ["technical"],                          category: "IT General",    hasVulns: true  },
@@ -83,28 +85,28 @@ export const REPORT_SECTIONS: ReportSection[] = [
   },
   {
     id: "toc", label: "Table of Contents", icon: "📋", required: false,
-    defaultFor: ["pentest","va","red_team","web_app","mobile_app","cloud","network","compliance","forensic","it_infra"],
+    defaultFor: ["pentest","va","red_team","web_app","mobile_app","cloud","network","compliance","forensic","it_infra","attack_surface"],
     reportTitle: "Table of Contents",
     desc: "Auto-generated list of all enabled sections with page numbers.",
     example: "",
   },
   {
     id: "doc_control", label: "Document Control", icon: "📋", required: false,
-    defaultFor: ["pentest","va","red_team","web_app","mobile_app","cloud","network","compliance","it_infra","code_review","arch_review","osint","incident","forensic","malware","breach","lessons_learned"],
+    defaultFor: ["pentest","va","red_team","web_app","mobile_app","cloud","network","compliance","it_infra","code_review","arch_review","osint","incident","forensic","malware","breach","lessons_learned","attack_surface"],
     reportTitle: "Document Control",
     desc: "Document version history, classification, authors and distribution list.",
     example: "This document is classified CONFIDENTIAL and is intended solely for the use of authorised personnel. Any reproduction or distribution without prior written consent of the issuing organisation is strictly prohibited.\n\nFor questions regarding this report, contact the lead assessor listed above.",
   },
   {
     id: "executive_summary", label: "Executive Summary", icon: "📊", required: false,
-    defaultFor: ["pentest","va","red_team","web_app","cloud","network","executive","retest","compliance","it_infra"],
+    defaultFor: ["pentest","va","red_team","web_app","cloud","network","executive","retest","compliance","it_infra","attack_surface"],
     reportTitle: "Executive Summary",
     desc: "High-level overview for decision-makers: overall risk posture, KPIs, and key findings at a glance.",
     example: "This report presents the results of the security assessment conducted on behalf of [Client Name] between [Start Date] and [End Date]. The assessment identified [N] vulnerabilities across the in-scope systems, of which [N] are rated Critical or High severity.\n\nThe overall security posture is assessed as [Poor / Fair / Good]. Immediate attention is required for the findings listed in the Remediation Plan section. A follow-up retest is recommended within [30/60/90] days.",
   },
   {
     id: "findings_summary", label: "Findings Summary", icon: "📊", required: false,
-    defaultFor: ["va","pentest","red_team","web_app","mobile_app","cloud","network","compliance","it_infra","code_review","risk_register","it_audit","dr"],
+    defaultFor: ["va","pentest","red_team","web_app","mobile_app","cloud","network","compliance","it_infra","code_review","risk_register","it_audit","dr","attack_surface"],
     reportTitle: "Findings Summary",
     desc: "Severity distribution charts and a consolidated table of all findings.",
     example: "A total of [N] vulnerabilities were identified during this assessment. The distribution by severity is as follows: [N] Critical, [N] High, [N] Medium, [N] Low, [N] Informational.\n\nThe majority of findings are concentrated in [area/component], suggesting systemic issues with [input validation / patch management / access control]. Priority should be given to the Critical and High severity items detailed in the following sections.",
@@ -118,7 +120,7 @@ export const REPORT_SECTIONS: ReportSection[] = [
   },
   {
     id: "scope", label: "Scope & Methodology", icon: "🎯", required: false,
-    defaultFor: ["pentest","va","red_team","web_app","mobile_app","cloud","network","it_infra","code_review"],
+    defaultFor: ["pentest","va","red_team","web_app","mobile_app","cloud","network","it_infra","code_review","attack_surface"],
     reportTitle: "Scope & Methodology",
     desc: "In-scope assets, IP ranges, application URLs, testing period, and methodology framework applied.",
     example: "The scope of this assessment encompassed the systems and services as defined in the Statement of Work. Testing was conducted between [Start Date] and [End Date] from [External / Internal] network perspective.\n\nIn-scope assets included: [list IP ranges, URLs, application names]. The following systems were explicitly excluded from testing: [list if any].\n\nThe assessment followed the [PTES / OWASP Testing Guide / NIST SP 800-115] methodology, augmented with proprietary techniques developed by [Assessor Org].",
@@ -160,21 +162,21 @@ export const REPORT_SECTIONS: ReportSection[] = [
   },
   {
     id: "vuln_details", label: "Vulnerability Details", icon: "🐛", required: false,
-    defaultFor: ["pentest","va","red_team","web_app","mobile_app","cloud","network","retest","it_infra","code_review","patch_mgmt","compliance"],
+    defaultFor: ["pentest","va","red_team","web_app","mobile_app","cloud","network","retest","it_infra","code_review","patch_mgmt","compliance","attack_surface"],
     reportTitle: "Vulnerability Overview",
     desc: "Full findings list with severity, CVSS score, EPSS, affected host/port, description, evidence, and remediation guidance.",
     example: "The following section details all vulnerabilities identified during the assessment, ordered by severity. Each finding includes a risk rating, technical description, evidence of exploitability, and specific remediation guidance.\n\nSeverity ratings follow the CVSS v3.1 standard. EPSS scores represent the probability of exploitation within the next 30 days. Findings marked [CONFIRMED EXPLOITABLE] were demonstrated during the engagement.",
   },
   {
     id: "host_breakdown", label: "Host Breakdown", icon: "🖥️", required: false,
-    defaultFor: ["pentest","va","network","cloud","it_infra"],
+    defaultFor: ["pentest","va","network","cloud","it_infra","attack_surface"],
     reportTitle: "Host Breakdown",
     desc: "Findings grouped by host/IP to help system owners understand their specific exposure.",
     example: "This section groups all identified vulnerabilities by affected host to facilitate remediation ownership assignment. Each system owner should review the findings attributed to systems under their responsibility and agree remediation timelines accordingly.\n\nHosts are ordered by total number of Critical and High severity findings. Systems with no findings are not listed.",
   },
   {
     id: "remediation_plan", label: "Remediation Plan", icon: "🔧", required: false,
-    defaultFor: ["pentest","va","remediation","retest","patch_mgmt","compliance"],
+    defaultFor: ["pentest","va","remediation","retest","patch_mgmt","compliance","attack_surface"],
     reportTitle: "Remediation Plan",
     desc: "Prioritised action list with recommended owners, effort estimates, and suggested deadlines.",
     example: "The following remediation plan prioritises all identified findings by severity and business impact. Recommended timelines assume standard operational capacity; they should be adjusted based on the organisation's change management process.\n\nSuggested SLAs: Critical — remediate within 24–72 hours; High — within 2 weeks; Medium — within 30 days; Low / Informational — within 90 days or next scheduled maintenance window.\n\nAll remediations should be verified through retesting before the finding is marked as resolved.",
@@ -250,8 +252,29 @@ export const REPORT_SECTIONS: ReportSection[] = [
     example: "Findings are mapped to the OWASP Mobile Application Security Verification Standard (MASVS v[version]) to assess coverage across the security domains: Architecture, Data Storage, Cryptography, Authentication, Network Communication, Platform Interaction, and Code Quality.\n\nThe target verification level for this assessment was [MASVS-L1 / MASVS-L2]. Controls marked as Fail represent direct findings. Controls marked as Partial require additional hardening to meet the full standard.",
   },
   {
+    id: "passive_recon", label: "Passive Reconnaissance", icon: "🔭", required: false,
+    defaultFor: ["attack_surface"],
+    reportTitle: "Passive Reconnaissance",
+    desc: "Passive OSINT: subdomains, DNS profile, WHOIS, certificate transparency logs, ASN/IP ranges, and Shodan exposure — no direct interaction with target systems.",
+    example: "Passive reconnaissance was conducted without directly interacting with target systems. The following findings represent publicly accessible information that an adversary could leverage during pre-attack planning.\n\nSubdomain enumeration via certificate transparency logs, passive DNS, and OSINT sources identified [N] active subdomains. ASN data reveals the organisation's IP ranges and hosting providers. All data was collected from publicly available sources.",
+  },
+  {
+    id: "web_surface", label: "Web Attack Surface", icon: "🌐", required: false,
+    defaultFor: ["attack_surface"],
+    reportTitle: "Web Attack Surface",
+    desc: "Live web assets, technology stack fingerprinting, security header audit, and WAF detection.",
+    example: "Active probing of the target's web presence identified [N] live HTTP/HTTPS endpoints. Technology fingerprinting revealed the server-side stack and frameworks in use. Security headers were audited against OWASP recommendations.\n\nMissing or misconfigured security headers represent a low-barrier attack surface that can facilitate client-side attacks such as clickjacking, XSS, and MIME sniffing. A WAF was [detected / not detected] during the assessment.",
+  },
+  {
+    id: "content_discovery", label: "Content Discovery", icon: "🗂️", required: false,
+    defaultFor: ["attack_surface"],
+    reportTitle: "Content Discovery",
+    desc: "Discovered paths, admin interfaces, API endpoints, backup files, and potential secrets found in JavaScript files.",
+    example: "Directory and endpoint enumeration identified [N] paths of interest across the assessed web assets. Notable findings include exposed administration interfaces, backup files accessible without authentication, and API endpoints not referenced in public documentation.\n\nJavaScript file analysis revealed [N] potential secrets or sensitive configuration values that warrant manual review. Findings marked as requiring manual review may contain false positives.",
+  },
+  {
     id: "network_overview", label: "Network Overview", icon: "🌐", required: false,
-    defaultFor: ["network","it_infra"],
+    defaultFor: ["network","it_infra","attack_surface"],
     reportTitle: "Network Overview",
     desc: "Discovered hosts, open services, network topology, and exposure summary.",
     example: "Network discovery identified [N] live hosts across the assessed IP ranges. The following section summarises the network topology, exposed services, and key observations relevant to the overall security posture.\n\nServices exposed to [external / internal] networks that were not expected in the scope documentation have been flagged for review. All management interfaces (SSH, RDP, SNMP, web admin panels) accessible from untrusted network segments are highlighted as priority findings.",
@@ -447,6 +470,21 @@ export const REPORT_TYPE_CHARTS: Partial<Record<ReportTypeId, Record<string, Cha
     cvss_radar:         { enabledFor: ["technical"] },
     epss_distribution:  { enabledFor: ["technical"] },
     vuln_by_host:       { enabledFor: ["technical"] },
+  },
+
+  // ── Attack Surface Assessment ─────────────────────────────────────────────
+  attack_surface: {
+    severity_donut:     { enabledFor: ["executive","management","technical"] },
+    risk_gauge:         { enabledFor: ["executive","management"] },
+    trend_line:         { enabledFor: [] },
+    top_hosts_bar:      { enabledFor: ["management","technical"] },              // top exposed hosts/subdomains
+    risk_matrix:        { enabledFor: ["management","technical"] },
+    vuln_by_category:   { enabledFor: ["executive","management","technical"] },  // dominant: Security Headers, Content Discovery, Network Exposure
+    remediation_effort: { enabledFor: ["management","technical"] },
+    fixed_vs_open:      { enabledFor: ["executive","management","technical"] },
+    cvss_radar:         { enabledFor: [], notApplicable: true },                 // most surface findings lack CVSS scores
+    epss_distribution:  { enabledFor: ["technical"] },
+    vuln_by_host:       { enabledFor: ["management","technical"] },
   },
 
   // ── 8. OSINT ──────────────────────────────────────────────────────────────

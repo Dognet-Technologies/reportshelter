@@ -74,6 +74,7 @@ class ScanImport(models.Model):
         WAPITI = "wapiti", "Wapiti"
         WFUZZ = "wfuzz", "Wfuzz"
         WPSCAN = "wpscan", "WPScan"
+        PENTEST_PIPELINE = "pentest_pipeline", "Pentest Pipeline Report (MD)"
         UNKNOWN = "unknown", "Unknown"
 
     subproject = models.ForeignKey(

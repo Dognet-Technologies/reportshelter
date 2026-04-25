@@ -41,6 +41,7 @@ from .wapiti_parser import WapitiParser
 from .wfuzz_parser import WfuzzParser
 from .wpscan_parser import WPScanParser
 from .zap_parser import ZAPParser
+from .pipeline_md_parser import PipelineMdParser
 
 PARSER_REGISTRY: dict[str, type[BaseParser]] = {
     # Original parsers
@@ -82,6 +83,7 @@ PARSER_REGISTRY: dict[str, type[BaseParser]] = {
     "wapiti": WapitiParser,
     "wfuzz": WfuzzParser,
     "wpscan": WPScanParser,
+    "pentest_pipeline": PipelineMdParser,
 }
 
 
