@@ -30,7 +30,7 @@ openpyxl==3.1.5
 
 # PDF generation
 weasyprint==68.1
-reportlab==4.2.5
+reportlab==4.4.10
 
 # Templating
 Jinja2==3.1.6
