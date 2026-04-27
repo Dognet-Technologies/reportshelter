@@ -1,5 +1,5 @@
 # Django core
-Django==6.0.3
+Django==6.0.4
 djangorestframework==3.17.1
 django-cors-headers==4.9.0
 django-filter==25.2
@@ -42,7 +42,7 @@ pandas==2.2.3
 kaleido==1.2.0
 
 # Email
-django-anymail==14.0
+django-anymail==15.0
 
 # Utils
 python-decouple==3.8
