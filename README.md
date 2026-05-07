@@ -161,11 +161,39 @@ Il traffico entra tramite **Nginx** sulla porta `8088`, che fa da reverse proxy 
 
 ## Aggiornamento
 
+Lo script `update.sh` (Linux / macOS) e `update.ps1` (Windows) gestiscono l'intero processo in modo sicuro:
+
+1. **Backup automatico** del database prima di qualsiasi modifica
+2. **`git pull`** dal branch `main`
+3. **Rebuild e restart** dei container Docker
+4. **Migrazioni** del database applicate automaticamente
+
+### Linux / macOS
+
 ```bash
-git pull
-docker compose build
-docker compose up -d
-docker compose exec backend python manage.py migrate
+./update.sh
+```
+
+### Windows (PowerShell)
+
+```powershell
+.\update.ps1
+```
+
+> Lo script deve essere eseguito dalla directory in cui hai clonato il repository, non dall'interno dei container.
+
+### Verifica aggiornamenti disponibili
+
+Dalla UI dell'applicazione: **Settings → About → Check for updates**
+
+Mostra la versione installata vs l'ultima release stabile su GitHub, con note di rilascio e link alla release.
+
+### Ripristino in caso di problemi
+
+Prima di ogni aggiornamento viene creato un backup automatico in `/app/backups/`. Per ripristinare:
+
+```bash
+docker compose exec backend python manage.py restore_database --yes <nome-backup.sql.gz>
 ```
 
 ---
