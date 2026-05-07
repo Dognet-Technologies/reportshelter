@@ -38,7 +38,7 @@ Jinja2==3.1.6
 # Charts & data
 matplotlib==3.10.1
 plotly==6.7.0
-pandas==2.2.3
+pandas==3.0.2
 kaleido==1.2.0
 
 # Email
