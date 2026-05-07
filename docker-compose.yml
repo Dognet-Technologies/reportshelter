@@ -38,6 +38,7 @@ services:
       - ./backend:/app
       - media_files:/app/media
       - quarantine_files:/app/quarantine
+      - backup_data:/app/backups
     ports:
       - "8000:8000"
     depends_on:
@@ -132,3 +133,4 @@ volumes:
   media_files:
   quarantine_files:
   static_files:
+  backup_data:    # pg_dump backups — sopravvive a down -v su altri volumi

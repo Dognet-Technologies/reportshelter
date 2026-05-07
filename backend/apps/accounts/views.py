@@ -698,8 +698,13 @@ class SystemInfoView(APIView):
 
         repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
+        # Version comes from env so it survives Docker image tagging.
+        # Falls back to git tag if env is not set.
+        app_version = os.environ.get("APP_VERSION", "")
+
         git_commit = "unknown"
         git_date = "unknown"
+        git_tag = "unknown"
         try:
             git_commit = subprocess.check_output(
                 ["git", "-C", repo_root, "rev-parse", "--short", "HEAD"],
@@ -711,11 +716,18 @@ class SystemInfoView(APIView):
                 stderr=subprocess.DEVNULL,
                 timeout=5,
             ).decode().strip()
+            git_tag = subprocess.check_output(
+                ["git", "-C", repo_root, "describe", "--tags", "--abbrev=0"],
+                stderr=subprocess.DEVNULL,
+                timeout=5,
+            ).decode().strip()
         except Exception:
             pass
 
+        version = app_version or git_tag or "1.0.0"
+
         return Response({
-            "version": "1.0.0",
+            "version": version,
             "git_commit": git_commit,
             "git_date": git_date,
             "repo_url": "https://github.com/Dognet-Technologies/reportshelter.git",
@@ -789,7 +801,12 @@ class KillAllTasksView(APIView):
 class SystemUpdateView(APIView):
     """
     POST /auth/admin/system-update/
-    Pull latest changes from the stable branch (admin only).
+    Safe update sequence: backup → git pull → migrate → response (admin only).
+
+    The backup is always created before any code or schema change so the
+    operator can restore to the previous state if something goes wrong.
+    A restart of Docker containers is still required after the pull to load
+    new static files and any new Python modules.
     """
 
     permission_classes = [permissions.IsAuthenticated, IsOrgAdmin]
@@ -797,23 +814,195 @@ class SystemUpdateView(APIView):
     def post(self, request: Request) -> Response:
         import subprocess
         import os
+        from django.core.management import call_command
+        from apps.accounts.backup import create_backup
 
         repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+        steps: list[dict] = []
 
+        # ── Step 1: pre-update backup ────────────────────────────────────────
         try:
-            result = subprocess.run(
+            backup_result = create_backup(label="pre-update")
+            steps.append({"step": "backup", "status": "ok", "detail": backup_result["filename"]})
+            logger.info("Pre-update backup created: %s", backup_result["filename"])
+        except Exception as exc:
+            logger.error("Pre-update backup failed: %s", exc)
+            return Response(
+                {
+                    "success": False,
+                    "steps": [{"step": "backup", "status": "failed", "detail": str(exc)}],
+                    "error": "Backup failed — update aborted to protect your data.",
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        # ── Step 2: git pull ─────────────────────────────────────────────────
+        try:
+            pull = subprocess.run(
                 ["git", "-C", repo_root, "pull", "origin", "main"],
                 capture_output=True,
                 text=True,
-                timeout=60,
+                timeout=120,
             )
-            output = result.stdout + result.stderr
-            success = result.returncode == 0
+            pull_output = (pull.stdout + pull.stderr).strip()
+            if pull.returncode != 0:
+                raise RuntimeError(pull_output)
+            steps.append({"step": "git_pull", "status": "ok", "detail": pull_output})
         except subprocess.TimeoutExpired:
-            return Response({"error": "Update timed out."}, status=status.HTTP_408_REQUEST_TIMEOUT)
+            steps.append({"step": "git_pull", "status": "failed", "detail": "Timed out after 120 s"})
+            return Response(
+                {"success": False, "steps": steps, "error": "git pull timed out."},
+                status=status.HTTP_408_REQUEST_TIMEOUT,
+            )
         except Exception as exc:
-            return Response({"error": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            steps.append({"step": "git_pull", "status": "failed", "detail": str(exc)})
+            return Response(
+                {"success": False, "steps": steps, "error": f"git pull failed: {exc}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
-        logger.info("System update triggered by %s: %s", request.user.email, output)
+        # ── Step 3: migrate ──────────────────────────────────────────────────
+        try:
+            call_command("migrate", "--noinput", verbosity=0)
+            steps.append({"step": "migrate", "status": "ok", "detail": "Migrations applied."})
+        except Exception as exc:
+            logger.error("Migrations failed after pull: %s", exc)
+            steps.append({"step": "migrate", "status": "failed", "detail": str(exc)})
+            return Response(
+                {
+                    "success": False,
+                    "steps": steps,
+                    "error": (
+                        "Migrations failed. Your data is safe — "
+                        f"restore from backup '{backup_result['filename']}' if needed."
+                    ),
+                    "backup_file": backup_result["filename"],
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
-        return Response({"success": success, "output": output})
+        logger.info(
+            "System update completed by %s — backup: %s",
+            request.user.email,
+            backup_result["filename"],
+        )
+
+        return Response({
+            "success": True,
+            "steps": steps,
+            "backup_file": backup_result["filename"],
+            "note": (
+                "Update applied. Restart Docker containers to load new static files "
+                "and any new Python modules: docker compose restart"
+            ),
+        })
+
+
+# ---------------------------------------------------------------------------
+# Backup management views
+# ---------------------------------------------------------------------------
+
+class BackupListView(APIView):
+    """
+    GET /auth/admin/backups/
+    List all database backups stored in /app/backups/ (admin only).
+    """
+
+    permission_classes = [permissions.IsAuthenticated, IsOrgAdmin]
+
+    def get(self, request: Request) -> Response:
+        from apps.accounts.backup import list_backups
+        return Response({"backups": list_backups()})
+
+
+class BackupCreateView(APIView):
+    """
+    POST /auth/admin/backups/
+    Trigger a manual pg_dump backup (admin only).
+    """
+
+    permission_classes = [permissions.IsAuthenticated, IsOrgAdmin]
+
+    def post(self, request: Request) -> Response:
+        from apps.accounts.backup import create_backup
+
+        label = request.data.get("label", "manual")
+        # Sanitize label: only alphanumeric and hyphens
+        label = "".join(c if c.isalnum() or c == "-" else "-" for c in str(label))[:32]
+
+        try:
+            result = create_backup(label=label)
+        except Exception as exc:
+            logger.error("Manual backup failed: %s", exc)
+            return Response(
+                {"success": False, "error": str(exc)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        logger.info("Manual backup created by %s: %s", request.user.email, result["filename"])
+        return Response({"success": True, **result}, status=status.HTTP_201_CREATED)
+
+
+class BackupRestoreView(APIView):
+    """
+    POST /auth/admin/backups/restore/
+    Restore the database from a named backup file (admin only).
+    Requires { "filename": "backup-....sql.gz", "confirm": "RESTORE" }.
+
+    WARNING: This overwrites all current data.  A fresh backup is created
+    automatically before the restore so the operator can undo if needed.
+    """
+
+    permission_classes = [permissions.IsAuthenticated, IsOrgAdmin]
+
+    def post(self, request: Request) -> Response:
+        from apps.accounts.backup import create_backup, restore_backup
+
+        filename = request.data.get("filename", "").strip()
+        confirm = request.data.get("confirm", "")
+
+        if not filename:
+            return Response(
+                {"error": "Provide 'filename' in request body."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if confirm != "RESTORE":
+            return Response(
+                {"error": "Send { \"confirm\": \"RESTORE\" } to confirm this destructive action."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Safety backup before overwriting
+        pre_restore_backup: str | None = None
+        try:
+            pre = create_backup(label="pre-restore")
+            pre_restore_backup = pre["filename"]
+        except Exception as exc:
+            logger.warning("Could not create pre-restore safety backup: %s", exc)
+
+        try:
+            restore_backup(filename)
+        except FileNotFoundError:
+            return Response(
+                {"error": f"Backup file not found: {filename}"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        except Exception as exc:
+            logger.error("Restore failed: %s", exc)
+            return Response(
+                {"success": False, "error": str(exc)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        logger.warning(
+            "Database restored by %s from '%s' (safety backup: %s)",
+            request.user.email,
+            filename,
+            pre_restore_backup,
+        )
+        return Response({
+            "success": True,
+            "restored_from": filename,
+            "safety_backup": pre_restore_backup,
+            "note": "Restart Docker containers to clear any cached state: docker compose restart",
+        })

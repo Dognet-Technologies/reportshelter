@@ -39,4 +39,9 @@ urlpatterns = [
     path("admin/system-info/", views.SystemInfoView.as_view(), name="system-info"),
     path("admin/kill-all-tasks/", views.KillAllTasksView.as_view(), name="kill-all-tasks"),
     path("admin/system-update/", views.SystemUpdateView.as_view(), name="system-update"),
+
+    # Backup management
+    path("admin/backups/", views.BackupListView.as_view(), name="backup-list"),
+    path("admin/backups/create/", views.BackupCreateView.as_view(), name="backup-create"),
+    path("admin/backups/restore/", views.BackupRestoreView.as_view(), name="backup-restore"),
 ]
