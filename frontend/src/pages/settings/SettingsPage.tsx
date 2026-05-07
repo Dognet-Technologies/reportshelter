@@ -1146,7 +1146,7 @@ function AboutSection() {
         <p>ReportShelter PRO — Professional Cybersecurity Report Generator</p>
         <p>
           Developed by{" "}
-          <a href="https://dognet-technologies.online" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">
+          <a href="https://dognet.tech" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">
             Dognet Technologies
           </a>
         </p>
