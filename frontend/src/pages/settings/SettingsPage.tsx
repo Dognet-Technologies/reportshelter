@@ -23,7 +23,6 @@ import {
   Download,
   Trash2,
   RefreshCw,
-  GitMerge,
   X,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
@@ -42,6 +41,7 @@ import {
   useDBStats,
   useSystemConfig,
   useUpdateSystemConfig,
+  useCheckUpdate,
 } from "@/api/hooks";
 import { Layout } from "@/components/Layout";
 import { useAuthStore } from "@/store/authStore";
@@ -927,6 +927,28 @@ function DBManagementSection() {
 
 // ─── About Section ────────────────────────────────────────────────────────────
 
+const BASH_CMD   = "./update.sh";
+const PS_CMD     = ".\\update.ps1";
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  function copy() {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+  return (
+    <button
+      onClick={copy}
+      className="shrink-0 rounded px-2 py-1 text-xs text-slate-400 hover:text-slate-100 hover:bg-slate-700 transition-colors"
+      title="Copy to clipboard"
+    >
+      {copied ? "Copied!" : "Copy"}
+    </button>
+  );
+}
+
 function AboutSection() {
   const [sysInfo, setSysInfo] = useState<{
     version: string;
@@ -935,43 +957,20 @@ function AboutSection() {
     repo_url: string;
   } | null>(null);
   const [loadingInfo, setLoadingInfo] = useState(false);
-  const [updating, setUpdating] = useState(false);
-  const [updateOutput, setUpdateOutput] = useState<string | null>(null);
+  const [shellTab, setShellTab] = useState<"bash" | "powershell">("bash");
 
-  async function loadInfo() {
+  const { data: updateData, isFetching: checkingUpdate, refetch: checkUpdate, error: updateError } = useCheckUpdate();
+
+  useEffect(() => {
     setLoadingInfo(true);
-    try {
-      const { apiClient } = await import("@/api/client");
-      const res = await apiClient.get("/auth/admin/system-info/");
-      setSysInfo(res.data);
-    } catch {
-      toast.error("Failed to load system info.");
-    } finally {
-      setLoadingInfo(false);
-    }
-  }
+    import("@/api/client")
+      .then(({ apiClient }) => apiClient.get("/auth/admin/system-info/"))
+      .then((res) => setSysInfo(res.data))
+      .catch(() => toast.error("Failed to load system info."))
+      .finally(() => setLoadingInfo(false));
+  }, []);
 
-  async function handleUpdate() {
-    setUpdating(true);
-    setUpdateOutput(null);
-    try {
-      const { apiClient } = await import("@/api/client");
-      const res = await apiClient.post("/auth/admin/system-update/");
-      setUpdateOutput(res.data.output);
-      if (res.data.success) {
-        toast.success("Update complete. Restart the application to apply changes.");
-      } else {
-        toast.error("Update finished with errors.");
-      }
-    } catch {
-      toast.error("Update failed.");
-    } finally {
-      setUpdating(false);
-    }
-  }
-
-  // Load on mount
-  useEffect(() => { loadInfo(); }, []);
+  const currentCmd = shellTab === "bash" ? BASH_CMD : PS_CMD;
 
   return (
     <div className="space-y-6">
@@ -983,8 +982,7 @@ function AboutSection() {
         </h3>
         {loadingInfo ? (
           <div className="flex items-center gap-2 text-slate-500 text-sm">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Loading…
+            <Loader2 className="h-4 w-4 animate-spin" /> Loading…
           </div>
         ) : sysInfo ? (
           <div className="space-y-2 text-sm">
@@ -1017,25 +1015,109 @@ function AboutSection() {
         ) : null}
       </div>
 
-      {/* Update */}
+      {/* Check for updates */}
       <div className="card space-y-4">
-        <h3 className="font-semibold text-slate-100 flex items-center gap-2">
-          <GitMerge className="h-4 w-4" />
-          Update Application
-        </h3>
-        <p className="text-sm text-slate-400">
-          Pull the latest stable release from the official repository.
-          After updating, restart the Docker containers to apply changes.
-        </p>
-        <button onClick={handleUpdate} disabled={updating} className="btn-primary">
-          {updating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-          {updating ? "Updating…" : "Pull latest update"}
-        </button>
-        {updateOutput && (
-          <pre className="mt-3 rounded-md bg-slate-900 border border-slate-700 p-3 text-xs text-slate-300 overflow-auto max-h-48 whitespace-pre-wrap">
-            {updateOutput}
-          </pre>
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-slate-100 flex items-center gap-2">
+            <RefreshCw className="h-4 w-4" />
+            Updates
+          </h3>
+          <button
+            onClick={() => checkUpdate()}
+            disabled={checkingUpdate}
+            className="btn-secondary text-xs py-1 px-3"
+          >
+            {checkingUpdate ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+            Check for updates
+          </button>
+        </div>
+
+        {updateError && (
+          <p className="text-sm text-red-400">Could not reach GitHub. Check your internet connection.</p>
         )}
+
+        {updateData && (
+          <div className="space-y-3">
+            {/* Version comparison */}
+            <div className="flex flex-wrap gap-4 text-sm">
+              <div>
+                <span className="text-slate-500 text-xs uppercase tracking-wide">Installed</span>
+                <div className="text-slate-100 font-mono font-semibold mt-0.5">
+                  v{updateData.current_version}
+                </div>
+              </div>
+              <div>
+                <span className="text-slate-500 text-xs uppercase tracking-wide">Latest</span>
+                <div className={`font-mono font-semibold mt-0.5 ${updateData.update_available ? "text-green-400" : "text-slate-100"}`}>
+                  v{updateData.latest_version}
+                </div>
+              </div>
+              <div className="flex items-end">
+                {updateData.update_available ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-green-900/40 border border-green-700 px-3 py-0.5 text-xs text-green-400">
+                    ⬆ Update available
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-slate-800 px-3 py-0.5 text-xs text-slate-400">
+                    ✓ Up to date
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Changelog excerpt */}
+            {updateData.update_available && updateData.changelog && (
+              <div className="rounded-md bg-slate-900 border border-slate-700 p-3">
+                <p className="text-xs text-slate-400 mb-2 font-medium">Release notes</p>
+                <pre className="text-xs text-slate-300 whitespace-pre-wrap max-h-32 overflow-auto">
+                  {updateData.changelog.slice(0, 600)}{updateData.changelog.length > 600 ? "…" : ""}
+                </pre>
+                {updateData.release_url && (
+                  <a
+                    href={updateData.release_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-2 inline-block text-xs text-blue-400 hover:text-blue-300"
+                  >
+                    View full release →
+                  </a>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Update command */}
+        <div className="space-y-2">
+          <p className="text-sm text-slate-400">
+            To apply an update, run the following command from your installation directory on the server:
+          </p>
+
+          {/* Shell tabs */}
+          <div className="flex gap-1 border-b border-slate-700">
+            {(["bash", "powershell"] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setShellTab(tab)}
+                className={`px-3 py-1.5 text-xs font-medium border-b-2 transition-colors ${
+                  shellTab === tab
+                    ? "border-blue-500 text-blue-400"
+                    : "border-transparent text-slate-500 hover:text-slate-300"
+                }`}
+              >
+                {tab === "bash" ? "Bash (Linux / macOS)" : "PowerShell (Windows)"}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2 rounded-md bg-slate-900 border border-slate-700 px-4 py-3">
+            <code className="flex-1 text-sm text-green-400 font-mono">{currentCmd}</code>
+            <CopyButton text={currentCmd} />
+          </div>
+          <p className="text-xs text-slate-500">
+            The script creates a backup, pulls the latest code, rebuilds the containers, and applies migrations automatically.
+          </p>
+        </div>
       </div>
 
       {/* Credits */}

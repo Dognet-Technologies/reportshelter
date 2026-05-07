@@ -125,6 +125,25 @@ export function useDBStats() {
   });
 }
 
+interface UpdateCheckResult {
+  current_version: string;
+  latest_version: string;
+  update_available: boolean;
+  published_at: string;
+  release_url: string;
+  changelog: string;
+}
+
+export function useCheckUpdate() {
+  return useQuery<UpdateCheckResult>({
+    queryKey: ["admin", "check-update"],
+    queryFn: () =>
+      apiClient.get<UpdateCheckResult>("/auth/admin/system-check-update/").then((r) => r.data),
+    enabled: false,
+    retry: false,
+  });
+}
+
 export function useSystemConfig() {
   return useQuery<{ backup_max_files: number }>({
     queryKey: ["admin", "system-config"],
