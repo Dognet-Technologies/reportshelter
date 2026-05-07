@@ -81,6 +81,9 @@ fi
 # ── step 3: rebuild and restart containers ────────────────────────────────────
 step "Step 3/4 — Rebuilding and restarting containers"
 $COMPOSE up -d --build && ok "Containers restarted" || fail "docker compose up failed"
+# nginx keeps the old upstream IPs in memory when other containers are recreated;
+# a targeted restart forces it to re-resolve via Docker's DNS.
+$COMPOSE restart nginx && ok "nginx reloaded" || warn "nginx restart failed — you may see 502 until the next nginx restart"
 
 # ── step 4: wait for backend health, then migrate ─────────────────────────────
 step "Step 4/4 — Waiting for backend to become healthy..."
