@@ -68,13 +68,30 @@ def _is_locked_out(email: str) -> bool:
     return recent_failures >= max_attempts
 
 
-def _send_password_reset_email(user: User, token: PasswordResetToken) -> None:
-    """Send password reset link."""
+def _send_password_reset_email(user: User, token: PasswordResetToken, temp_password: str) -> None:
+    """
+    Send password reset email containing a temporary password and an activation link.
+    The password is NOT changed until the user clicks the link — this prevents lockout
+    if the reset was triggered accidentally.
+    """
     frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173")
-    reset_url = f"{frontend_url}/reset-password?token={token.token}"
+    activation_url = f"{frontend_url}/reset-password?token={token.token}"
+    name = user.first_name or user.email
+    body = (
+        f"Hi {name},\n\n"
+        f"Someone requested a password reset for your ReportShelter PRO account.\n\n"
+        f"Your temporary password is:\n\n"
+        f"    {temp_password}\n\n"
+        f"To activate this reset, click the link below:\n"
+        f"{activation_url}\n\n"
+        f"Once you click the link, your password will be changed to the temporary one above.\n"
+        f"You will be required to set a new permanent password immediately after logging in.\n\n"
+        f"This link expires in 1 hour.\n"
+        f"If you did not request this, ignore this email — your current password remains unchanged."
+    )
     send_mail(
-        subject="Reset your CyberReport Pro password",
-        message=f"Hi {user.first_name or user.email},\n\nReset your password: {reset_url}\n\nThis link expires in 1 hour.",
+        subject="Reset your ReportShelter PRO password",
+        message=body,
         from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=[user.email],
         fail_silently=True,
@@ -297,7 +314,10 @@ class PasswordChangeView(APIView):
 class PasswordResetRequestView(APIView):
     """
     POST /auth/password/reset/
-    Send password reset email (always returns 200 to avoid user enumeration).
+    Generate a temporary password, store it in the token, and send an activation email.
+    The account password is NOT changed until the user clicks the activation link.
+    Returns 404 explicitly when the email is not registered — this is an internal
+    tool where users are always invited by an admin, so enumeration is not a concern.
     """
 
     permission_classes = [permissions.AllowAny]
@@ -309,20 +329,27 @@ class PasswordResetRequestView(APIView):
         email = serializer.validated_data["email"].lower()
         try:
             user = User.objects.get(email=email)
-            token = PasswordResetToken.create_for_user(user)
-            _send_password_reset_email(user, token)
         except User.DoesNotExist:
-            pass  # Silent — no user enumeration
+            return Response(
+                {"success": False, "error": "This email address is not registered in our system."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        temp_password = secrets.token_urlsafe(12)  # 16 URL-safe chars
+        token = PasswordResetToken.create_for_user(user, temp_password)
+        _send_password_reset_email(user, token, temp_password)
 
         return Response(
-            {"success": True, "message": "If that email is registered, a reset link has been sent."}
+            {"success": True, "message": "Reset instructions have been sent to your email."}
         )
 
 
 class PasswordResetConfirmView(APIView):
     """
     POST /auth/password/reset/confirm/
-    Validate token and set new password.
+    Activation endpoint — called when the user clicks the link in the email.
+    Sets the account password to the stored temporary password and forces
+    a password change on next login.
     """
 
     permission_classes = [permissions.AllowAny]
@@ -336,24 +363,30 @@ class PasswordResetConfirmView(APIView):
                 token=serializer.validated_data["token"]
             )
         except PasswordResetToken.DoesNotExist:
-            return Response({"success": False, "error": "Invalid token."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"success": False, "error": "Invalid or expired link."}, status=status.HTTP_400_BAD_REQUEST)
 
         if not token.is_valid():
-            return Response({"success": False, "error": "Token expired or already used."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"success": False, "error": "This link has already been used or has expired."}, status=status.HTTP_400_BAD_REQUEST)
 
-        token.user.set_password(serializer.validated_data["new_password"])
-        token.user.save(update_fields=["password"])
+        if not token.temp_password:
+            return Response({"success": False, "error": "Invalid reset token."}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = token.user
+        user.set_password(token.temp_password)
+        user.must_change_password = True
+        user.save(update_fields=["password", "must_change_password"])
+
         token.used = True
         token.save(update_fields=["used"])
 
         AuditLog.log(
             action=AuditLog.Action.PASSWORD_RESET,
-            user=token.user,
-            detail={"method": "reset"},
+            user=user,
+            detail={"method": "temp_password_activation"},
             ip_address=_get_client_ip(request),
         )
 
-        return Response({"success": True, "message": "Password reset successfully."})
+        return Response({"success": True, "message": "Password reset activated. You can now log in with your temporary password."})
 
 
 # ---------------------------------------------------------------------------
@@ -470,7 +503,7 @@ class InviteUserView(APIView):
 
         user = User.objects.create_user(
             email=email,
-            password=None,
+            password="admin",
             organization=request.user.organization,
             first_name=data.get("first_name", ""),
             last_name=data.get("last_name", ""),

@@ -172,12 +172,6 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-slate-500">
-          Don&apos;t have an account?{" "}
-          <Link to="/register" className="text-blue-400 hover:text-blue-300 font-medium">
-            Create one
-          </Link>
-        </p>
       </div>
     </div>
   );

@@ -5,6 +5,8 @@ import { useAuthStore } from "@/store/authStore";
 import LoginPage from "@/pages/auth/LoginPage";
 import RegisterPage from "@/pages/auth/RegisterPage";
 import ChangePasswordPage from "@/pages/auth/ChangePasswordPage";
+import ForgotPasswordPage from "@/pages/auth/ForgotPasswordPage";
+import ResetPasswordPage from "@/pages/auth/ResetPasswordPage";
 
 // App pages
 import DashboardPage from "@/pages/DashboardPage";
@@ -35,6 +37,8 @@ export default function App() {
       {/* Public routes */}
       <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
       <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
+      <Route path="/forgot-password" element={<PublicRoute><ForgotPasswordPage /></PublicRoute>} />
+      <Route path="/reset-password" element={<PublicRoute><ResetPasswordPage /></PublicRoute>} />
 
       {/* Force password change (authenticated but restricted) */}
       <Route path="/change-password" element={<ChangePasswordPage />} />

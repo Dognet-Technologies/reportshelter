@@ -135,20 +135,9 @@ class PasswordResetRequestSerializer(serializers.Serializer):
 
 
 class PasswordResetConfirmSerializer(serializers.Serializer):
-    """Confirm password reset with token."""
+    """Activate a password reset by token (link click). No new password required from the user."""
 
     token = serializers.CharField()
-    new_password = serializers.CharField(write_only=True, min_length=12)
-    confirm_password = serializers.CharField(write_only=True)
-
-    def validate(self, attrs: dict) -> dict:
-        if attrs["new_password"] != attrs["confirm_password"]:
-            raise serializers.ValidationError({"confirm_password": "Passwords do not match."})
-        try:
-            validate_password(attrs["new_password"])
-        except DjangoValidationError as e:
-            raise serializers.ValidationError({"new_password": list(e.messages)}) from e
-        return attrs
 
 
 class ProfileUpdateSerializer(serializers.ModelSerializer):

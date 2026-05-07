@@ -158,11 +158,14 @@ class EmailVerificationToken(models.Model):
 class PasswordResetToken(models.Model):
     """
     Short-lived token (1h) for password reset flows.
-    One active token per user; creating a new one invalidates the previous.
+    Stores a plaintext temp_password that is set on the user only when
+    the activation link is clicked — not on request. This prevents the
+    account from being locked out if the reset was triggered by mistake.
     """
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="password_reset_tokens")
     token = models.CharField(max_length=64, unique=True, db_index=True)
+    temp_password = models.CharField(max_length=64, default="")
     expires_at = models.DateTimeField(default=_password_reset_expiry)
     used = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -171,12 +174,13 @@ class PasswordResetToken(models.Model):
         verbose_name = "Password Reset Token"
 
     @classmethod
-    def create_for_user(cls, user: User) -> "PasswordResetToken":
-        """Invalidate existing tokens and create a fresh one."""
+    def create_for_user(cls, user: User, temp_password: str) -> "PasswordResetToken":
+        """Invalidate existing tokens and create a fresh one with the temp password."""
         cls.objects.filter(user=user, used=False).update(used=True)
         return cls.objects.create(
             user=user,
             token=secrets.token_urlsafe(48),
+            temp_password=temp_password,
         )
 
     def is_valid(self) -> bool:
