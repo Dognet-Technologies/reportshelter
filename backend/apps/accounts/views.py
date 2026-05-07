@@ -798,26 +798,78 @@ class KillAllTasksView(APIView):
         return Response({"killed": count, "message": f"{count} task(s) cancelled."})
 
 
+class SystemCheckUpdateView(APIView):
+    """
+    GET /auth/admin/system-check-update/
+    Compare installed version with latest GitHub Release (admin only).
+    No side effects — safe to call frequently.
+    """
+
+    permission_classes = [permissions.IsAuthenticated, IsOrgAdmin]
+
+    RELEASES_API = "https://api.github.com/repos/Dognet-Technologies/reportshelter/releases/latest"
+
+    def get(self, request: Request) -> Response:
+        import os
+        import urllib.request
+        import json as _json
+
+        current = os.environ.get("APP_VERSION", "unknown").lstrip("v")
+
+        try:
+            req = urllib.request.Request(
+                self.RELEASES_API,
+                headers={"Accept": "application/vnd.github+json", "User-Agent": "ReportShelter"},
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = _json.loads(resp.read())
+
+            latest_tag = data.get("tag_name", "unknown").lstrip("v")
+            published_at = data.get("published_at", "")
+            release_url = data.get("html_url", "")
+            body = data.get("body", "")
+
+        except Exception as exc:
+            return Response(
+                {"error": f"Could not reach GitHub: {exc}"},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        update_available = latest_tag != current and latest_tag != "unknown"
+
+        return Response({
+            "current_version": current,
+            "latest_version": latest_tag,
+            "update_available": update_available,
+            "published_at": published_at,
+            "release_url": release_url,
+            "changelog": body,
+            "update_command": "git pull origin main && docker compose up -d --build",
+        })
+
+
 class SystemUpdateView(APIView):
     """
     POST /auth/admin/system-update/
-    Safe update sequence: backup → git pull → migrate → response (admin only).
+    Pre-update safety backup + DB migration (admin only).
 
-    The backup is always created before any code or schema change so the
-    operator can restore to the previous state if something goes wrong.
-    A restart of Docker containers is still required after the pull to load
-    new static files and any new Python modules.
+    The code update itself (git pull + container rebuild) must be run on the
+    host by the operator — the container cannot and should not pull from GitHub
+    on behalf of the user.  This endpoint handles only what the container can
+    safely do: protect the data before the operator applies the update.
+
+    Typical operator flow:
+        1. GET /system-check-update/ → see what's new
+        2. POST /system-update/      → backup DB, apply pending migrations
+        3. On host: git pull origin main && docker compose up -d --build
     """
 
     permission_classes = [permissions.IsAuthenticated, IsOrgAdmin]
 
     def post(self, request: Request) -> Response:
-        import subprocess
-        import os
         from django.core.management import call_command
         from apps.accounts.backup import create_backup
 
-        repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
         steps: list[dict] = []
 
         # ── Step 1: pre-update backup ────────────────────────────────────────
@@ -836,37 +888,12 @@ class SystemUpdateView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-        # ── Step 2: git pull ─────────────────────────────────────────────────
-        try:
-            pull = subprocess.run(
-                ["git", "-C", repo_root, "pull", "origin", "main"],
-                capture_output=True,
-                text=True,
-                timeout=120,
-            )
-            pull_output = (pull.stdout + pull.stderr).strip()
-            if pull.returncode != 0:
-                raise RuntimeError(pull_output)
-            steps.append({"step": "git_pull", "status": "ok", "detail": pull_output})
-        except subprocess.TimeoutExpired:
-            steps.append({"step": "git_pull", "status": "failed", "detail": "Timed out after 120 s"})
-            return Response(
-                {"success": False, "steps": steps, "error": "git pull timed out."},
-                status=status.HTTP_408_REQUEST_TIMEOUT,
-            )
-        except Exception as exc:
-            steps.append({"step": "git_pull", "status": "failed", "detail": str(exc)})
-            return Response(
-                {"success": False, "steps": steps, "error": f"git pull failed: {exc}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-
-        # ── Step 3: migrate ──────────────────────────────────────────────────
+        # ── Step 2: migrate (applies any migrations already present on disk) ─
         try:
             call_command("migrate", "--noinput", verbosity=0)
             steps.append({"step": "migrate", "status": "ok", "detail": "Migrations applied."})
         except Exception as exc:
-            logger.error("Migrations failed after pull: %s", exc)
+            logger.error("Migrations failed: %s", exc)
             steps.append({"step": "migrate", "status": "failed", "detail": str(exc)})
             return Response(
                 {
@@ -882,7 +909,7 @@ class SystemUpdateView(APIView):
             )
 
         logger.info(
-            "System update completed by %s — backup: %s",
+            "Pre-update preparation completed by %s — backup: %s",
             request.user.email,
             backup_result["filename"],
         )
@@ -891,10 +918,7 @@ class SystemUpdateView(APIView):
             "success": True,
             "steps": steps,
             "backup_file": backup_result["filename"],
-            "note": (
-                "Update applied. Restart Docker containers to load new static files "
-                "and any new Python modules: docker compose restart"
-            ),
+            "next_step": "git pull origin main && docker compose up -d --build",
         })
 
 

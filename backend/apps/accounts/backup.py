@@ -19,8 +19,15 @@ from django.conf import settings
 logger = logging.getLogger(__name__)
 
 BACKUP_DIR = Path("/app/backups")
-MAX_BACKUPS = 10
 BACKUP_GLOB = "backup-*.sql.gz"
+
+
+def _max_backups() -> int:
+    """Read limit from env, fall back to Django setting, then to 5."""
+    try:
+        return int(os.environ.get("BACKUP_MAX_FILES", getattr(settings, "BACKUP_MAX_FILES", 5)))
+    except (ValueError, TypeError):
+        return 5
 
 
 # ---------------------------------------------------------------------------
@@ -105,7 +112,7 @@ def create_backup(label: str = "manual") -> dict:
     size = filepath.stat().st_size
     logger.info("Backup created: %s (%d bytes)", filename, size)
 
-    _rotate_old_backups()
+    _rotate_old_backups(_max_backups())
 
     return {
         "filename": filename,
@@ -187,10 +194,10 @@ def list_backups() -> list[dict]:
 # Internal
 # ---------------------------------------------------------------------------
 
-def _rotate_old_backups() -> None:
-    """Delete the oldest backups, keeping only MAX_BACKUPS files."""
+def _rotate_old_backups(max_files: int) -> None:
+    """Delete the oldest backups, keeping only max_files files."""
     backups = sorted(BACKUP_DIR.glob(BACKUP_GLOB), key=lambda p: p.stat().st_mtime)
-    to_delete = backups[:-MAX_BACKUPS] if len(backups) > MAX_BACKUPS else []
+    to_delete = backups[:-max_files] if len(backups) > max_files else []
     for old in to_delete:
         try:
             old.unlink()
