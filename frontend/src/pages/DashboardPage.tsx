@@ -77,9 +77,14 @@ function LicenseCard({ license }: { license: LicenseStatus }) {
           )}
         </div>
         {license.status !== "pro_active" && (
-          <Link to="/settings" className="btn-primary text-xs px-3 py-1.5 shrink-0">
+          <a
+            href="https://dognet.tech/richiesta-licenze/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-primary text-xs px-3 py-1.5 shrink-0"
+          >
             Upgrade to PRO
-          </Link>
+          </a>
         )}
       </div>
     </div>

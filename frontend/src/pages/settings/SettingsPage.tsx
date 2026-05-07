@@ -644,6 +644,26 @@ function LicenseSection() {
         </div>
       )}
 
+      {/* Upgrade CTA */}
+      {(!license || license.status !== "pro_active") && (
+        <div className="card flex items-center justify-between gap-4">
+          <div>
+            <h3 className="font-semibold text-slate-100">Unlock PRO Features</h3>
+            <p className="text-sm text-slate-400 mt-0.5">
+              Unlimited projects, report export, scan imports and priority support.
+            </p>
+          </div>
+          <a
+            href="https://dognet.tech/richiesta-licenze/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-primary shrink-0"
+          >
+            Upgrade to PRO
+          </a>
+        </div>
+      )}
+
       {/* Activate form */}
       <div className="card">
         <h3 className="font-semibold text-slate-100 mb-2 flex items-center gap-2">
