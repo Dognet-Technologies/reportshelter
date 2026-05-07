@@ -55,6 +55,22 @@ fi
 step "Step 2/4 — Pulling latest code (branch: $BRANCH)"
 git pull origin "$BRANCH" && ok "Code updated" || fail "git pull failed"
 
+# ── step 2b: sync APP_VERSION from .env.example → .env ───────────────────────
+# Only APP_VERSION is touched — every other user-edited entry is preserved.
+NEW_VERSION=$(grep -E '^APP_VERSION=' "$REPO_DIR/.env.example" 2>/dev/null | cut -d= -f2 | tr -d '"' | tr -d "'" | xargs)
+if [[ -n "$NEW_VERSION" && -f "$REPO_DIR/.env" ]]; then
+    if grep -qE '^APP_VERSION=' "$REPO_DIR/.env"; then
+        # Line exists — replace it in-place
+        sed -i "s|^APP_VERSION=.*|APP_VERSION=${NEW_VERSION}|" "$REPO_DIR/.env"
+    else
+        # Line missing — append it
+        echo "APP_VERSION=${NEW_VERSION}" >> "$REPO_DIR/.env"
+    fi
+    ok "APP_VERSION set to ${NEW_VERSION} in .env"
+else
+    warn "Could not read APP_VERSION from .env.example — .env left unchanged"
+fi
+
 # ── step 3: rebuild and restart containers ────────────────────────────────────
 step "Step 3/4 — Rebuilding and restarting containers"
 $COMPOSE up -d --build && ok "Containers restarted" || fail "docker compose up failed"
