@@ -41,6 +41,9 @@ urlpatterns = [
     path("admin/system-update/", views.SystemUpdateView.as_view(), name="system-update"),
     path("admin/kill-all-tasks/", views.KillAllTasksView.as_view(), name="kill-all-tasks"),
 
+    # System configuration
+    path("admin/system-config/", views.SystemConfigView.as_view(), name="system-config"),
+
     # Backup management
     path("admin/backups/", views.BackupListView.as_view(), name="backup-list"),
     path("admin/backups/create/", views.BackupCreateView.as_view(), name="backup-create"),

@@ -40,6 +40,8 @@ import {
   useLicenseStatus,
   useActivateLicense,
   useDBStats,
+  useSystemConfig,
+  useUpdateSystemConfig,
 } from "@/api/hooks";
 import { Layout } from "@/components/Layout";
 import { useAuthStore } from "@/store/authStore";
@@ -685,6 +687,70 @@ function LicenseSection() {
 
 // ─── DB Management Section ────────────────────────────────────────────────────
 
+function BackupRetentionCard() {
+  const { data: config, isLoading } = useSystemConfig();
+  const updateConfig = useUpdateSystemConfig();
+  const [value, setValue] = useState<number | "">("");
+  const [dirty, setDirty] = useState(false);
+
+  useEffect(() => {
+    if (config !== undefined && !dirty) setValue(config.backup_max_files);
+  }, [config, dirty]);
+
+  async function handleSave() {
+    if (typeof value !== "number" || value < 1 || value > 100) return;
+    try {
+      await updateConfig.mutateAsync({ backup_max_files: value });
+      toast.success("Backup retention updated.");
+      setDirty(false);
+    } catch {
+      toast.error("Failed to update backup retention.");
+    }
+  }
+
+  return (
+    <div className="card space-y-4">
+      <h3 className="font-semibold text-slate-100 flex items-center gap-2">
+        <Database className="h-4 w-4" />
+        Backup Retention
+      </h3>
+      <p className="text-sm text-slate-400">
+        Number of automatic backups to keep. Older ones are deleted when the limit is reached.
+      </p>
+      {isLoading ? (
+        <div className="flex items-center gap-2 text-slate-500 text-sm">
+          <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+        </div>
+      ) : (
+        <div className="flex items-center gap-4">
+          <input
+            type="number"
+            min={1}
+            max={100}
+            value={value}
+            onChange={(e) => {
+              setValue(e.target.value === "" ? "" : Number(e.target.value));
+              setDirty(true);
+            }}
+            className="input w-24 text-center font-mono"
+          />
+          <span className="text-sm text-slate-400">backups</span>
+          <button
+            onClick={handleSave}
+            disabled={!dirty || updateConfig.isPending || typeof value !== "number" || value < 1 || value > 100}
+            className="btn-primary"
+          >
+            {updateConfig.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            Save
+          </button>
+          {dirty && <span className="text-xs text-amber-400">Unsaved changes</span>}
+        </div>
+      )}
+      <p className="text-xs text-slate-500">Allowed range: 1–100. Default: 5.</p>
+    </div>
+  );
+}
+
 function DBManagementSection() {
   const { data: dbStats, isLoading, refetch } = useDBStats();
   const [resetConfirm, setResetConfirm] = useState("");
@@ -788,6 +854,9 @@ function DBManagementSection() {
           </div>
         ) : null}
       </div>
+
+      {/* Backup retention */}
+      <BackupRetentionCard />
 
       {/* Export */}
       <div className="card space-y-3">

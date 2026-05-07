@@ -23,7 +23,12 @@ BACKUP_GLOB = "backup-*.sql.gz"
 
 
 def _max_backups() -> int:
-    """Read limit from env, fall back to Django setting, then to 5."""
+    """DB setting takes priority over env var (allows UI configuration)."""
+    try:
+        from apps.accounts.models import SystemConfig
+        return SystemConfig.get().backup_max_files
+    except Exception:
+        pass
     try:
         return int(os.environ.get("BACKUP_MAX_FILES", getattr(settings, "BACKUP_MAX_FILES", 5)))
     except (ValueError, TypeError):

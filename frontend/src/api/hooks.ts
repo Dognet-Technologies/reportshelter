@@ -125,6 +125,25 @@ export function useDBStats() {
   });
 }
 
+export function useSystemConfig() {
+  return useQuery<{ backup_max_files: number }>({
+    queryKey: ["admin", "system-config"],
+    queryFn: () =>
+      apiClient.get<{ backup_max_files: number }>("/auth/admin/system-config/").then((r) => r.data),
+  });
+}
+
+export function useUpdateSystemConfig() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { backup_max_files: number }) =>
+      apiClient.patch<{ backup_max_files: number }>("/auth/admin/system-config/", data).then((r) => r.data),
+    onSuccess: (data) => {
+      qc.setQueryData(["admin", "system-config"], data);
+    },
+  });
+}
+
 // ─── License hooks ───────────────────────────────────────────────────────────
 
 export function useLicenseStatus(options?: Partial<UseQueryOptions<LicenseStatus>>) {

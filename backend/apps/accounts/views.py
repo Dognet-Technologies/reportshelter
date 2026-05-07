@@ -930,6 +930,43 @@ class SystemUpdateView(APIView):
 
 
 # ---------------------------------------------------------------------------
+# System configuration
+# ---------------------------------------------------------------------------
+
+class SystemConfigView(APIView):
+    """
+    GET  /auth/admin/system-config/  — return current system settings
+    PATCH /auth/admin/system-config/ — update one or more settings
+    """
+
+    permission_classes = [permissions.IsAuthenticated, IsOrgAdmin]
+
+    def get(self, request: Request) -> Response:
+        from .models import SystemConfig
+        config = SystemConfig.get()
+        return Response({"backup_max_files": config.backup_max_files})
+
+    def patch(self, request: Request) -> Response:
+        from .models import SystemConfig
+        config = SystemConfig.get()
+
+        val = request.data.get("backup_max_files")
+        if val is not None:
+            try:
+                val = int(val)
+                if not (1 <= val <= 100):
+                    raise ValueError
+            except (ValueError, TypeError):
+                return Response(
+                    {"error": "backup_max_files must be an integer between 1 and 100"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            config.backup_max_files = val
+            config.save(update_fields=["backup_max_files"])
+
+        return Response({"backup_max_files": config.backup_max_files})
+
+
 # Backup management views
 # ---------------------------------------------------------------------------
 

@@ -270,3 +270,26 @@ class AuditLog(models.Model):
             detail=detail or {},
             ip_address=ip_address,
         )
+
+
+class SystemConfig(models.Model):
+    """
+    Singleton row (always pk=1) for system-wide configuration.
+    Persists settings that admins can change via the UI without touching .env.
+    """
+
+    backup_max_files = models.PositiveIntegerField(
+        default=5,
+        help_text="Number of pg_dump backups to keep before rotating (1-100).",
+    )
+
+    class Meta:
+        verbose_name = "System configuration"
+
+    @classmethod
+    def get(cls) -> "SystemConfig":
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def __str__(self) -> str:
+        return "System configuration"
