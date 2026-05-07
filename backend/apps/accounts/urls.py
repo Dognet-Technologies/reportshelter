@@ -37,6 +37,12 @@ urlpatterns = [
     path("admin/db-export/", views.DBExportView.as_view(), name="db-export"),
     path("admin/db-reset/", views.DBResetView.as_view(), name="db-reset"),
     path("admin/system-info/", views.SystemInfoView.as_view(), name="system-info"),
-    path("admin/kill-all-tasks/", views.KillAllTasksView.as_view(), name="kill-all-tasks"),
+    path("admin/system-check-update/", views.SystemCheckUpdateView.as_view(), name="system-check-update"),
     path("admin/system-update/", views.SystemUpdateView.as_view(), name="system-update"),
+    path("admin/kill-all-tasks/", views.KillAllTasksView.as_view(), name="kill-all-tasks"),
+
+    # Backup management
+    path("admin/backups/", views.BackupListView.as_view(), name="backup-list"),
+    path("admin/backups/create/", views.BackupCreateView.as_view(), name="backup-create"),
+    path("admin/backups/restore/", views.BackupRestoreView.as_view(), name="backup-restore"),
 ]

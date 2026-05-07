@@ -5,6 +5,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libpq-dev \
     libmagic1 \
+    # pg_dump / psql for backup and restore
+    postgresql-client \
+    # git for system update pull
+    git \
     # WeasyPrint dependencies
     libpango-1.0-0 \
     libpangoft2-1.0-0 \
@@ -26,12 +30,12 @@ RUN pip install --no-cache-dir --timeout=120 --retries=5 -r requirements.txt
 # Copy project
 COPY . .
 
-# Create directories for media, static, quarantine
-RUN mkdir -p /app/media /app/static /app/quarantine
+# Create directories for media, static, quarantine, backups
+RUN mkdir -p /app/media /app/static /app/quarantine /app/backups
 
 # Non-root user for security
 RUN adduser --disabled-password --gecos '' appuser && \
-    chown -R appuser:appuser /app
+    chown -R appuser:appuser /app /app/backups
 USER appuser
 
 EXPOSE 8000
