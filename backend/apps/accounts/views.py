@@ -702,27 +702,34 @@ class SystemInfoView(APIView):
         # Falls back to git tag if env is not set.
         app_version = os.environ.get("APP_VERSION", "")
 
-        git_commit = "unknown"
-        git_date = "unknown"
-        git_tag = "unknown"
-        try:
-            git_commit = subprocess.check_output(
-                ["git", "-C", repo_root, "rev-parse", "--short", "HEAD"],
-                stderr=subprocess.DEVNULL,
-                timeout=5,
-            ).decode().strip()
-            git_date = subprocess.check_output(
-                ["git", "-C", repo_root, "log", "-1", "--format=%ci"],
-                stderr=subprocess.DEVNULL,
-                timeout=5,
-            ).decode().strip()
-            git_tag = subprocess.check_output(
-                ["git", "-C", repo_root, "describe", "--tags", "--abbrev=0"],
-                stderr=subprocess.DEVNULL,
-                timeout=5,
-            ).decode().strip()
-        except Exception:
-            pass
+        # Prefer env vars (set by update.sh after git pull on the host).
+        # Subprocess fallback works only in dev where .git is accessible.
+        git_commit = os.environ.get("GIT_COMMIT", "")
+        git_date = os.environ.get("GIT_DATE", "")
+        git_tag = ""
+
+        if not git_commit:
+            try:
+                git_commit = subprocess.check_output(
+                    ["git", "-C", repo_root, "rev-parse", "--short", "HEAD"],
+                    stderr=subprocess.DEVNULL,
+                    timeout=5,
+                ).decode().strip()
+                git_date = subprocess.check_output(
+                    ["git", "-C", repo_root, "log", "-1", "--format=%ci"],
+                    stderr=subprocess.DEVNULL,
+                    timeout=5,
+                ).decode().strip()
+                git_tag = subprocess.check_output(
+                    ["git", "-C", repo_root, "describe", "--tags", "--abbrev=0"],
+                    stderr=subprocess.DEVNULL,
+                    timeout=5,
+                ).decode().strip()
+            except Exception:
+                pass
+
+        git_commit = git_commit or "unknown"
+        git_date = git_date or "unknown"
 
         version = app_version or git_tag or "1.0.0"
 

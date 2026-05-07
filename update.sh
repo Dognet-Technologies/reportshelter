@@ -55,20 +55,27 @@ fi
 step "Step 2/4 — Pulling latest code (branch: $BRANCH)"
 git pull origin "$BRANCH" && ok "Code updated" || fail "git pull failed"
 
-# ── step 2b: sync APP_VERSION from .env.example → .env ───────────────────────
-# Only APP_VERSION is touched — every other user-edited entry is preserved.
-NEW_VERSION=$(grep -E '^APP_VERSION=' "$REPO_DIR/.env.example" 2>/dev/null | cut -d= -f2 | tr -d '"' | tr -d "'" | xargs)
-if [[ -n "$NEW_VERSION" && -f "$REPO_DIR/.env" ]]; then
-    if grep -qE '^APP_VERSION=' "$REPO_DIR/.env"; then
-        # Line exists — replace it in-place
-        sed -i "s|^APP_VERSION=.*|APP_VERSION=${NEW_VERSION}|" "$REPO_DIR/.env"
+# ── step 2b: sync APP_VERSION, GIT_COMMIT, GIT_DATE from repo → .env ──────────
+# Only these three keys are touched — all other user-edited entries are preserved.
+_upsert_env() {
+    local key="$1" value="$2" file="$3"
+    if grep -qE "^${key}=" "$file"; then
+        sed -i "s|^${key}=.*|${key}=${value}|" "$file"
     else
-        # Line missing — append it
-        echo "APP_VERSION=${NEW_VERSION}" >> "$REPO_DIR/.env"
+        echo "${key}=${value}" >> "$file"
     fi
-    ok "APP_VERSION set to ${NEW_VERSION} in .env"
+}
+
+if [[ -f "$REPO_DIR/.env" ]]; then
+    NEW_VERSION=$(grep -E '^APP_VERSION=' "$REPO_DIR/.env.example" 2>/dev/null | cut -d= -f2 | tr -d '"' | tr -d "'" | xargs)
+    NEW_COMMIT=$(git -C "$REPO_DIR" rev-parse --short HEAD 2>/dev/null || echo "unknown")
+    NEW_DATE=$(git -C "$REPO_DIR" log -1 --format=%ci 2>/dev/null || echo "unknown")
+
+    [[ -n "$NEW_VERSION" ]] && { _upsert_env "APP_VERSION" "$NEW_VERSION" "$REPO_DIR/.env"; ok "APP_VERSION=${NEW_VERSION}"; }
+    _upsert_env "GIT_COMMIT" "$NEW_COMMIT" "$REPO_DIR/.env"; ok "GIT_COMMIT=${NEW_COMMIT}"
+    _upsert_env "GIT_DATE"   "$NEW_DATE"   "$REPO_DIR/.env"; ok "GIT_DATE=${NEW_DATE}"
 else
-    warn "Could not read APP_VERSION from .env.example — .env left unchanged"
+    warn ".env not found — skipping version sync"
 fi
 
 # ── step 3: rebuild and restart containers ────────────────────────────────────
