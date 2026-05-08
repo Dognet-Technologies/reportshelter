@@ -54,12 +54,17 @@ if ($LASTEXITCODE -ne 0) { Write-Fail "docker compose not found" }
 Write-Step "Step 1/4 — Pre-update database backup"
 $running = & docker compose -f "$RepoDir\docker-compose.yml" ps backend 2>$null |
     Select-String "Up"
+$BackupFile = ""
 if ($running) {
     Write-Warn "Triggering backup via management command..."
-    & docker compose -f "$RepoDir\docker-compose.yml" exec -T backend `
-        python manage.py backup_database --label pre-update
-    if ($LASTEXITCODE -eq 0) { Write-OK "Backup created in /app/backups/" }
-    else { Write-Warn "Backup failed — proceeding anyway" }
+    $backupOutput = & docker compose -f "$RepoDir\docker-compose.yml" exec -T backend `
+        python manage.py backup_database --label pre-update 2>&1
+    if ($LASTEXITCODE -eq 0) {
+        $BackupFile = ($backupOutput | Select-String 'backup-\S+\.sql\.gz').Matches.Value | Select-Object -First 1
+        Write-OK "Backup created: $($BackupFile ?? '/app/backups/')"
+    } else {
+        Write-Warn "Backup failed — proceeding anyway"
+    }
 } else {
     Write-Warn "Containers not running — skipping backup step"
 }
@@ -134,6 +139,15 @@ $finalVersion = ((Get-Content $envFile | Where-Object { $_ -match "^APP_VERSION=
 Write-Host ""
 Write-OK "Update complete — version: $finalVersion"
 Write-Host ""
-Write-Host "  If something looks wrong, restore with:"
-Write-Host "  docker compose exec backend python manage.py restore_database --yes <backup-file>"
+Write-Host "  Backups location (inside container): /app/backups/"
+Write-Host "  List backups:  docker compose exec backend ls -lh /app/backups/"
+if ($BackupFile) {
+    Write-Host ""
+    Write-Host "  Pre-update backup: $BackupFile"
+    Write-Host "  Restore with:"
+    Write-Host "  docker compose exec backend python manage.py restore_database --yes $BackupFile"
+} else {
+    Write-Host "  Restore with:"
+    Write-Host "  docker compose exec backend python manage.py restore_database --yes <backup-file>"
+}
 Write-Host ""

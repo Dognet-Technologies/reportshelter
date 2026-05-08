@@ -42,11 +42,16 @@ $COMPOSE version >/dev/null 2>&1  || fail "docker compose not found"
 
 # ── step 1: backup via API (if containers are running) ───────────────────────
 step "Step 1/4 — Pre-update database backup"
+BACKUP_FILE=""
 if $COMPOSE ps backend 2>/dev/null | grep -q "Up"; then
     warn "Triggering backup via management command..."
-    $COMPOSE exec -T backend python manage.py backup_database --label pre-update \
-        && ok "Backup created in /app/backups/" \
-        || warn "Backup failed — proceeding anyway (check backup volume manually)"
+    BACKUP_OUTPUT=$($COMPOSE exec -T backend python manage.py backup_database --label pre-update 2>&1)
+    if [[ $? -eq 0 ]]; then
+        BACKUP_FILE=$(echo "$BACKUP_OUTPUT" | grep -oP 'backup-[^\s]+\.sql\.gz' | head -1)
+        ok "Backup created: ${BACKUP_FILE:-/app/backups/}"
+    else
+        warn "Backup failed — proceeding anyway (check backup volume manually)"
+    fi
 else
     warn "Containers not running — skipping backup step"
 fi
@@ -108,6 +113,15 @@ NEW_VERSION=$(grep -E '^APP_VERSION=' "$REPO_DIR/.env" 2>/dev/null | cut -d= -f2
 echo ""
 ok "Update complete — version: ${NEW_VERSION}"
 echo ""
-echo "  If something looks wrong, restore with:"
-echo "  docker compose exec backend python manage.py restore_database --yes <backup-file>"
+echo "  Backups location (inside container): /app/backups/"
+echo "  List backups:  docker compose exec backend ls -lh /app/backups/"
+if [[ -n "$BACKUP_FILE" ]]; then
+    echo ""
+    echo "  Pre-update backup: ${BACKUP_FILE}"
+    echo "  Restore with:"
+    echo "  docker compose exec backend python manage.py restore_database --yes ${BACKUP_FILE}"
+else
+    echo "  Restore with:"
+    echo "  docker compose exec backend python manage.py restore_database --yes <backup-file>"
+fi
 echo ""

@@ -188,12 +188,21 @@ Dalla UI dell'applicazione: **Settings → About → Check for updates**
 
 Mostra la versione installata vs l'ultima release stabile su GitHub, con note di rilascio e link alla release.
 
-### Ripristino in caso di problemi
+### Backup e ripristino
 
-Prima di ogni aggiornamento viene creato un backup automatico in `/app/backups/`. Per ripristinare:
+I backup vengono salvati **dentro il container** in `/app/backups/`, su un volume Docker dedicato (`backup_data`) che sopravvive ai rebuild.
 
 ```bash
+# Elenco dei backup disponibili
+docker compose exec backend ls -lh /app/backups/
+
+# Ripristino (il nome esatto viene mostrato a fine update.sh)
 docker compose exec backend python manage.py restore_database --yes <nome-backup.sql.gz>
+```
+
+Il nome del backup segue il formato `backup-v{versione}-{label}-{data}.sql.gz`, ad esempio:
+```
+backup-v0.9.9-pre-update-20260508-143000.sql.gz
 ```
 
 ---
