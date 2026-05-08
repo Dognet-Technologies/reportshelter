@@ -150,6 +150,13 @@ def restore_backup(filename: str) -> None:
     except Exception as exc:
         raise RuntimeError(f"Cannot read backup file: {exc}") from exc
 
+    # pg_dump from PostgreSQL 17+ emits SET transaction_timeout which is
+    # unrecognized by PostgreSQL ≤16. Strip it so old and new dumps both restore.
+    sql_data = b"\n".join(
+        line for line in sql_data.split(b"\n")
+        if b"transaction_timeout" not in line
+    )
+
     cmd = [
         "psql",
         *_db_conn_args(),

@@ -5,8 +5,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libpq-dev \
     libmagic1 \
-    # pg_dump / psql for backup and restore
-    postgresql-client \
+    # pg_dump / psql for backup and restore — version pinned to match postgres:15 server
+    postgresql-client-15 \
     # git for system update pull
     git \
     # WeasyPrint dependencies
