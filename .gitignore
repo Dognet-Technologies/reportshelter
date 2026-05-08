@@ -212,3 +212,6 @@ __marimo__/
 Immagini/*
 .github/*
 backend/static/admin/
+.claude/skills/
+.claude/skills/*/
+.claude/*
