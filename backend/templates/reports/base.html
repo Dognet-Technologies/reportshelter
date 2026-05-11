@@ -5,42 +5,64 @@
   <title>{{ project.title }} — {{ report_type_label }}</title>
   <style>
     /* ---------------------------------------------------------------
-       WeasyPrint-compatible CSS — no flexbox/grid (limited support)
-       Style variables come from rpt_style (per-report overrides merged
-       with project-level defaults).
+       WeasyPrint-compatible CSS (float-based layout, no flexbox/grid)
+       Style variables injected by generator via rpt_style dict.
        --------------------------------------------------------------- */
     @page {
       size: A4;
-      margin: 20mm 18mm 25mm 18mm;
+      margin: 20mm 18mm 26mm 18mm;
       @top-center   { content: element(header); }
       @bottom-center{ content: element(footer); }
     }
 
-    /* Running header */
+    /* ── Running header — 3 columns: right-float · left-float · overflow-center ──
+       Order in HTML: .header-right first (float), then .header-left (float),
+       then .header-center (overflow:hidden block fills the gap). */
     #running-header {
       position: running(header);
       width: 100%;
-      border-bottom: 1px solid {{ rpt_style.primary_color }};
-      padding-bottom: 4px;
-      font-size: 9pt;
+      border-bottom: 2px solid {{ rpt_style.primary_color }};
+      padding-bottom: 3px;
+      font-size: 8.5pt;
       color: #555;
     }
+    #running-header .header-right {
+      float: right;
+      font-size: 8pt;
+      color: #888;
+      white-space: nowrap;
+    }
     #running-header .header-left  { float: left; }
-    #running-header .header-right { float: right; color: #888; }
+    #running-header .header-center {
+      display: block;
+      overflow: hidden;
+      text-align: center;
+      font-size: 8pt;
+      font-style: italic;
+      color: {{ rpt_style.secondary_color }};
+    }
 
-    /* Running footer */
+    /* ── Running footer — 3 columns: same float trick ── */
     #running-footer {
       position: running(footer);
       width: 100%;
       border-top: 1px solid #ddd;
-      padding-top: 4px;
+      padding-top: 3px;
       font-size: 8pt;
       color: #888;
     }
-    #running-footer .footer-left  { float: left; }
-    #running-footer .footer-right { float: right; }
+    #running-footer .footer-right  { float: right; white-space: nowrap; }
+    #running-footer .footer-left   { float: left; }
+    #running-footer .footer-center {
+      display: block;
+      overflow: hidden;
+      text-align: center;
+      font-size: 7.5pt;
+      font-style: italic;
+      color: #bbb;
+    }
 
-    /* Page counter */
+    /* ── Page counter ── */
     .page-number::after {
       {% if project.footer_page_numbering == 'n_of_total' %}
         content: counter(page) " / " counter(pages);
@@ -51,7 +73,7 @@
       {% endif %}
     }
 
-    /* Watermark */
+    /* ── Watermark ── */
     {% if rpt_style.watermark %}
     #watermark {
       position: fixed;
@@ -69,25 +91,50 @@
     }
     {% endif %}
 
-    /* Base typography */
+    /* ── Base typography ── */
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: "{{ rpt_style.font }}", "Helvetica Neue", Arial, sans-serif;
       font-size: 10pt;
       color: #1f2937;
-      line-height: 1.5;
+      line-height: 1.55;
     }
-    h1 { font-size: {{ rpt_style.title_h1 }}; color: {{ rpt_style.primary_color }};   margin-bottom: 12px; }
-    h2 { font-size: {{ rpt_style.title_h2 }}; color: {{ rpt_style.primary_color }};   border-bottom: 2px solid {{ rpt_style.primary_color }}; padding-bottom: 4px; margin: 24px 0 12px; }
-    h3 { font-size: {{ rpt_style.title_h3 }}; color: {{ rpt_style.secondary_color }}; margin: 16px 0 8px; }
-    p  { margin-bottom: 8px; }
+    h1 {
+      font-size: {{ rpt_style.title_h1 }};
+      color: {{ rpt_style.primary_color }};
+      margin: 0 0 14px;
+      page-break-after: avoid;
+    }
+    h2 {
+      font-size: {{ rpt_style.title_h2 }};
+      color: {{ rpt_style.primary_color }};
+      border-bottom: 2px solid {{ rpt_style.primary_color }};
+      padding-bottom: 5px;
+      margin: 26px 0 14px;
+      page-break-after: avoid;
+    }
+    h3 {
+      font-size: {{ rpt_style.title_h3 }};
+      color: {{ rpt_style.secondary_color }};
+      margin: 18px 0 8px;
+      page-break-after: avoid;
+    }
+    p {
+      margin-bottom: 9px;
+      text-align: justify;
+      hyphens: auto;
+      orphans: 3;
+      widows: 3;
+    }
+    ul, ol { margin: 4px 0 10px 22px; }
+    li     { margin-bottom: 4px; line-height: 1.6; }
 
-    /* Cover page */
+    /* ── Cover page ── */
     .cover { page: cover; height: 260mm; text-align: center; padding-top: 80mm; }
     @page cover { margin: 0; @top-center { content: none; } @bottom-center { content: none; } }
     .cover-title    { font-size: 28pt; color: {{ rpt_style.primary_color }};   font-weight: bold; }
     .cover-subtitle { font-size: 14pt; color: {{ rpt_style.secondary_color }}; margin-top: 8px; }
-    .cover-meta     { margin-top: 40px; font-size: 10pt; color: #555; }
+    .cover-meta     { margin-top: 40px; font-size: 10pt; color: #555; line-height: 1.8; text-align: center; }
     .cover-line     { width: 80px; height: 4px; background: {{ rpt_style.primary_color }}; margin: 20px auto; }
     .classification-badge {
       display: inline-block;
@@ -101,61 +148,27 @@
       margin-bottom: 16px;
     }
 
-    /* Tool coverage box (management + technical audiences, cover page) */
-    .cover-tools {
-      margin-top: 28px;
-      font-size: 8pt;
-      color: #6b7280;
-    }
-    .cover-tools-label {
-      font-weight: bold;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 6px;
-      color: #374151;
-    }
-    .cover-tools-list { margin-bottom: 6px; }
-    .tool-badge {
-      display: inline-block;
-      background: #f3f4f6;
-      border: 1px solid #e5e7eb;
-      border-radius: 4px;
-      padding: 2px 8px;
-      margin: 2px 3px;
-      font-size: 7.5pt;
-      color: #374151;
-    }
-    .tool-count {
-      background: {{ rpt_style.primary_color }};
-      color: #fff;
-      border-radius: 3px;
-      padding: 0 4px;
-      font-size: 7pt;
-      margin-left: 3px;
-    }
-    .cover-tools-missing {
-      color: #d97706;
-      font-style: italic;
-      margin-top: 4px;
-    }
-    .cover-tools-required-missing {
-      color: #dc2626;
-      font-style: italic;
-      margin-top: 4px;
-    }
+    /* ── Cover: tool coverage (management + technical) ── */
+    .cover-tools              { margin-top: 28px; font-size: 8pt; color: #6b7280; text-align: center; }
+    .cover-tools-label        { font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; color: #374151; }
+    .cover-tools-list         { margin-bottom: 6px; }
+    .tool-badge               { display: inline-block; background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 4px; padding: 2px 8px; margin: 2px 3px; font-size: 7.5pt; color: #374151; }
+    .tool-count               { background: {{ rpt_style.primary_color }}; color: #fff; border-radius: 3px; padding: 0 4px; font-size: 7pt; margin-left: 3px; }
+    .cover-tools-missing          { color: #d97706; font-style: italic; margin-top: 4px; }
+    .cover-tools-required-missing { color: #dc2626; font-style: italic; margin-top: 4px; }
 
-    /* Section page break */
+    /* ── Section page break ── */
     .page-break { page-break-before: always; }
 
-    /* Executive summary KPI boxes */
-    .kpi-row  { width: 100%; margin-bottom: 16px; }
-    .kpi-box  {
+    /* ── Executive summary KPI boxes ── */
+    .kpi-row { width: 100%; margin-bottom: 18px; }
+    .kpi-box {
       display: inline-block;
-      width: 18%;
-      margin-right: 2%;
+      width: 17%;
+      margin-right: 2.5%;
       border: 1px solid #e5e7eb;
       border-top: 4px solid {{ rpt_style.primary_color }};
-      padding: 10px;
+      padding: 10px 6px;
       text-align: center;
       vertical-align: top;
       border-radius: {{ rpt_style.border_radius_px }};
@@ -165,35 +178,43 @@
     .kpi-box.medium   { border-top-color: #d97706; }
     .kpi-box.low      { border-top-color: #2563eb; }
     .kpi-box.info     { border-top-color: #6b7280; }
-    .kpi-number { font-size: 22pt; font-weight: bold; }
-    .kpi-label  { font-size: 8pt;  color: #6b7280;   text-transform: uppercase; }
+    .kpi-number { font-size: 22pt; font-weight: bold; color: #111827; }
+    .kpi-label  { font-size: 7.5pt; color: #6b7280; text-transform: uppercase; letter-spacing: 0.3px; margin-top: 2px; }
 
-    /* Chart containers */
+    /* ── Charts ──
+       Half-chart: max-height 58mm keeps them square-ish at A4 half-width.
+       Full-chart: max-height 95mm caps tall charts at ~1/3 of page height.
+       WeasyPrint scales images proportionally when max-height is hit. */
     .chart-grid { width: 100%; margin-bottom: 20px; }
-    .chart-half { display: inline-block; width: 48%; vertical-align: top; }
+    .chart-half { display: inline-block; width: 48%; vertical-align: top; margin-bottom: 8px; }
     .chart-half + .chart-half { margin-left: 3%; }
-    .chart-full { width: 100%; }
-    .chart-img  { width: 100%; }
+    .chart-full { width: 100%; margin-bottom: 8px; }
+    .chart-img  { width: 100%; display: block; }
+    .chart-half .chart-img { max-height: 58mm; }
+    .chart-full .chart-img { max-height: 95mm; }
 
-    /* Vulnerability table */
+    /* ── Vulnerability table ── */
     table.vuln-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 9pt; }
     table.vuln-table th {
       background: {{ rpt_style.primary_color }};
       color: #fff;
-      padding: 6px 8px;
+      padding: 7px 10px;
       text-align: left;
+      font-weight: 600;
     }
-    table.vuln-table td { padding: 5px 8px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+    table.vuln-table td { padding: 6px 10px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
     table.vuln-table tr:nth-child(even) td { background: #f9fafb; }
+    table.vuln-table tr { page-break-inside: avoid; }
 
-    /* Severity badge */
+    /* ── Severity badge ── */
     .badge {
       display: inline-block;
       padding: 2px 8px;
       border-radius: {{ rpt_style.border_radius_px }};
-      font-size: 8pt;
+      font-size: 7.5pt;
       font-weight: bold;
       color: #fff;
+      letter-spacing: 0.2px;
     }
     .badge-critical  { background: #dc2626; }
     .badge-high      { background: #ea580c; }
@@ -202,78 +223,84 @@
     .badge-info      { background: #6b7280; }
     .badge-recurring { background: #7c3aed; }
 
-    /* Vulnerability detail card */
-    .vuln-card        { border: 1px solid #e5e7eb; border-radius: {{ rpt_style.border_radius_px }}; margin-bottom: 24px; overflow: hidden; page-break-inside: avoid; }
+    /* ── Vulnerability detail card ── */
+    .vuln-card        { border: 1px solid #e5e7eb; border-radius: {{ rpt_style.border_radius_px }}; margin-bottom: 20px; overflow: hidden; page-break-inside: avoid; }
     .vuln-card-header { background: #f3f4f6; padding: 10px 14px; border-bottom: 1px solid #e5e7eb; }
-    .vuln-card-body   { padding: 12px 14px; }
-    .vuln-meta        { font-size: 8.5pt; color: #6b7280; margin-bottom: 8px; }
+    .vuln-card-body   { padding: 12px 16px; }
+    .vuln-meta        { font-size: 8.5pt; color: #6b7280; margin-bottom: 10px; }
     .vuln-meta span   { margin-right: 14px; }
 
-    /* Custom section intro text (user-authored via Report Builder) */
+    /* ── Custom section intro ── */
     .section-custom-intro {
       background: #f8fafc;
       border-left: 3px solid {{ rpt_style.primary_color }};
       padding: 8px 12px;
-      margin: 10px 0 14px;
+      margin: 10px 0 16px;
       font-size: 9.5pt;
       color: #374151;
       border-radius: 0 {{ rpt_style.border_radius_px }} {{ rpt_style.border_radius_px }} 0;
     }
 
+    /* ── Evidence styles ── */
     .evidence-code {
       font-family: "Courier New", Courier, monospace;
       font-size: 8pt;
       background: #1f2937;
       color: #f9fafb;
-      padding: 10px;
+      padding: 10px 12px;
       border-radius: {{ rpt_style.border_radius_px }};
       white-space: pre-wrap;
       word-break: break-all;
       margin: 8px 0;
+      line-height: 1.4;
     }
     .evidence-box {
       font-family: "Courier New", Courier, monospace;
       font-size: 8pt;
       border: 1px solid #e5e7eb;
       background: #f9fafb;
-      padding: 10px;
+      padding: 10px 12px;
       border-radius: {{ rpt_style.border_radius_px }};
       white-space: pre-wrap;
       word-break: break-all;
       margin: 8px 0;
+      line-height: 1.4;
     }
     .evidence-shaded {
       font-family: "Courier New", Courier, monospace;
       font-size: 8pt;
       background: #e5e7eb;
-      padding: 10px;
+      padding: 10px 12px;
       border-radius: {{ rpt_style.border_radius_px }};
       white-space: pre-wrap;
       word-break: break-all;
       margin: 8px 0;
+      line-height: 1.4;
     }
     .evidence-marker {
       font-family: "Courier New", Courier, monospace;
       font-size: 8pt;
       border-left: 4px solid {{ rpt_style.primary_color }};
       background: #f0f9ff;
-      padding: 10px;
+      padding: 10px 12px;
       white-space: pre-wrap;
       word-break: break-all;
       margin: 8px 0;
+      line-height: 1.4;
     }
 
-    /* Host breakdown */
-    .host-section { margin-bottom: 20px; }
-    .host-title   { font-size: 11pt; font-weight: bold; color: {{ rpt_style.secondary_color }}; margin-bottom: 6px; }
+    /* ── Host breakdown ── */
+    .host-section { margin-bottom: 22px; }
+    .host-title   { font-size: 11pt; font-weight: bold; color: {{ rpt_style.secondary_color }}; margin-bottom: 6px; page-break-after: avoid; }
 
-    /* Remediation table */
+    /* ── Remediation table ── */
     table.rem-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 9pt; }
-    table.rem-table th { background: {{ rpt_style.secondary_color }}; color: #fff; padding: 6px 8px; text-align: left; }
-    table.rem-table td { padding: 5px 8px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+    table.rem-table th { background: {{ rpt_style.secondary_color }}; color: #fff; padding: 7px 10px; text-align: left; font-weight: 600; }
+    table.rem-table td { padding: 6px 10px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
     table.rem-table tr:nth-child(even) td { background: #f9fafb; }
+    table.rem-table tr { page-break-inside: avoid; }
 
-    /* Last page */
+    /* ── Last page ── */
     .last-page { page: lastpage; text-align: center; padding-top: 80mm; }
     @page lastpage { margin: 0; @top-center { content: none; } @bottom-center { content: none; } }
   </style>
@@ -311,26 +338,27 @@
   <div id="watermark">{{ rpt_style.watermark }}</div>
   {% endif %}
 
-  <!-- Running header -->
+  <!-- Running header: right floated first, then left, then center fills the gap -->
   <div id="running-header">
+    <span class="header-right">
+      <strong style="color:{{ rpt_style.primary_color }};">{{ rpt_extra.classification }}</strong>
+      {% if project.header_show_date %}&nbsp;·&nbsp;{{ now()|format_date }}{% endif %}
+    </span>
     <span class="header-left">
       {% if project.header_logo_left and org.logo %}
-        <img src="{{ org.logo.path }}" style="height:18px; vertical-align:middle;" />
+        <img src="{{ org.logo.path }}" style="height:15px; vertical-align:middle; margin-right:4px;" />
       {% endif %}
-      {% if project.header_text_center %}
-        &nbsp;{{ project.header_text_center }}
-      {% endif %}
-      &nbsp;<span style="color:#aaa;font-size:8pt;">{{ rpt_extra.classification }}</span>
+      <strong>{{ org.name }}</strong>
+      {% if project.header_text_center %}&nbsp;·&nbsp;{{ project.header_text_center }}{% endif %}
     </span>
-    <span class="header-right">
-      {% if project.header_show_date %}{{ now()|format_date }}{% endif %}
-    </span>
+    <span class="header-center">{{ project.title }}</span>
   </div>
 
-  <!-- Running footer -->
+  <!-- Running footer: right floated first, then left, then center fills the gap -->
   <div id="running-footer">
-    <span class="footer-left">{{ rpt_extra.footer_override or project.footer_text }}</span>
     <span class="footer-right"><span class="page-number"></span></span>
+    <span class="footer-left">{{ rpt_extra.footer_override or project.footer_text or (rpt_extra.classification ~ " — " ~ org.name) }}</span>
+    <span class="footer-center">{{ project.client_name or "" }}</span>
   </div>
 
   {# ================================================================
