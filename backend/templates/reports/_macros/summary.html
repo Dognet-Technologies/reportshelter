@@ -2,8 +2,13 @@
    SUMMARY MACROS
    Covers: toc, doc_control, executive_summary, risk_summary,
    findings_summary, scope, engagement_overview, recommendations, appendix
-   All macros receive their data from the rendering context (imported
-   with context from base.html).  _ci() is a Python callable in context.
+
+   Audience behaviour:
+     executive   – high-level, business language, minimal charts,
+                   no CVSS/EPSS, no technical detail
+     management  – balanced, severity breakdown, effort hints,
+                   no raw evidence
+     technical   – full detail (default)
    ================================================================ #}
 
 {# ── Table of Contents ── #}
@@ -73,6 +78,82 @@
 <div class="page-break">
   <h2>Executive Summary</h2>
   {{ _ci('executive_summary') }}
+
+  {% if audience == 'executive' %}
+  {# ── EXECUTIVE view: overall risk banner + business KPIs + 2 charts max ── #}
+
+  {# Overall risk banner #}
+  <div style="border:2px solid {{ exec_metrics.overall_risk_color }};
+              border-radius:6px; padding:14px 18px; margin-bottom:20px;
+              background:{{ exec_metrics.overall_risk_color }}18;">
+    <span style="font-size:11pt; font-weight:bold; color:{{ exec_metrics.overall_risk_color }};">
+      Overall Risk Rating: {{ exec_metrics.overall_risk_label }}
+    </span>
+    <span style="font-size:9pt; color:#374151; margin-left:16px;">
+      {{ exec_metrics.immediate_action }} finding{{ "s" if exec_metrics.immediate_action != 1 else "" }}
+      require{{ "" if exec_metrics.immediate_action != 1 else "s" }} immediate action
+    </span>
+  </div>
+
+  <p>
+    This report summarises the security assessment of
+    <strong>{{ project.client_name or "the target organization" }}</strong>
+    (<em>{{ subproject.title }}</em>).
+    The engagement identified <strong>{{ vulnerabilities|length }}</strong>
+    security finding{{ "s" if vulnerabilities|length != 1 else "" }},
+    of which <strong>{{ exec_metrics.immediate_action }}</strong>
+    are classified as Critical or High severity and require priority remediation.
+    {% if exec_metrics.high_epss > 0 %}
+    Additionally, <strong>{{ exec_metrics.high_epss }}</strong>
+    finding{{ "s" if exec_metrics.high_epss != 1 else "" }}
+    {{ "have" if exec_metrics.high_epss != 1 else "has" }} a high likelihood
+    of active exploitation based on threat intelligence data.
+    {% endif %}
+  </p>
+
+  {# Business KPI row: Total / Immediate Action / Remediation Required #}
+  <div class="kpi-row">
+    <div class="kpi-box">
+      <div class="kpi-number">{{ vulnerabilities|length }}</div>
+      <div class="kpi-label">Findings Total</div>
+    </div>
+    <div class="kpi-box critical">
+      <div class="kpi-number">{{ exec_metrics.immediate_action }}</div>
+      <div class="kpi-label">Immediate Action</div>
+    </div>
+    <div class="kpi-box medium">
+      <div class="kpi-number">{{ severity_counts.get('medium', 0) }}</div>
+      <div class="kpi-label">Remediation Needed</div>
+    </div>
+    <div class="kpi-box low">
+      <div class="kpi-number">{{ severity_counts.get('low', 0) + severity_counts.get('info', 0) }}</div>
+      <div class="kpi-label">Low / Informational</div>
+    </div>
+    {% if exec_metrics.high_epss > 0 %}
+    <div class="kpi-box high">
+      <div class="kpi-number">{{ exec_metrics.high_epss }}</div>
+      <div class="kpi-label">High Exploit Risk</div>
+    </div>
+    {% endif %}
+  </div>
+
+  {# Executive charts: pie + risk gauge only #}
+  <div class="chart-grid">
+    {% if charts.pie %}
+    <div class="chart-half">
+      <img class="chart-img" src="data:image/png;base64,{{ charts.pie }}" />
+    </div>
+    {% endif %}
+    {% if charts.risk_gauge %}
+    <div class="chart-half">
+      <img class="chart-img" src="data:image/png;base64,{{ charts.risk_gauge }}" />
+    </div>
+    {% endif %}
+  </div>
+
+  {% else %}
+  {# ── MANAGEMENT / TECHNICAL view: full KPIs + all charts ── #}
+
   <p>
     This report presents the findings of the
     <strong>{{ report_type_label }}</strong> conducted on
@@ -80,6 +161,7 @@
     The assessment covered <em>{{ subproject.title }}</em> and identified
     <strong>{{ vulnerabilities|length }}</strong> vulnerabilit{{ "y" if vulnerabilities|length == 1 else "ies" }}.
   </p>
+
   <div class="kpi-row">
     <div class="kpi-box">
       <div class="kpi-number">{{ vulnerabilities|length }}</div>
@@ -92,6 +174,7 @@
     </div>
     {% endfor %}
   </div>
+
   {% if 'risk_summary' in sections %}
   <div class="chart-grid">
     {% if charts.pie %}
@@ -123,6 +206,8 @@
     {% endif %}
   </div>
   {% endif %}
+
+  {% endif %}{# end audience branch #}
 </div>
 {% endmacro %}
 
@@ -151,17 +236,22 @@
       <img class="chart-img" src="data:image/png;base64,{{ charts.pie }}" />
     </div>
     {% endif %}
-    {% if charts.bar %}
+    {% if charts.bar and audience != 'executive' %}
     <div class="chart-half">
       <img class="chart-img" src="data:image/png;base64,{{ charts.bar }}" />
     </div>
+    {% elif charts.risk_gauge and audience == 'executive' %}
+    <div class="chart-half">
+      <img class="chart-img" src="data:image/png;base64,{{ charts.risk_gauge }}" />
+    </div>
     {% endif %}
   </div>
-  {% if charts.risk_matrix %}
+  {% if charts.risk_matrix and audience != 'executive' %}
   <div class="chart-full">
     <img class="chart-img" src="data:image/png;base64,{{ charts.risk_matrix }}" />
   </div>
   {% endif %}
+  {% if audience != 'executive' %}
   <div class="chart-grid">
     {% if charts.risk_gauge %}
     <div class="chart-half">
@@ -174,6 +264,7 @@
     </div>
     {% endif %}
   </div>
+  {% endif %}
 </div>
 {% endif %}
 {% endmacro %}
@@ -208,6 +299,11 @@
     </div>
     {% endif %}
   </div>
+  {% if audience != 'executive' and charts.fixed_vs_open %}
+  <div class="chart-full">
+    <img class="chart-img" src="data:image/png;base64,{{ charts.fixed_vs_open }}" />
+  </div>
+  {% endif %}
 </div>
 {% endmacro %}
 
@@ -217,6 +313,25 @@
 <div class="page-break">
   <h2>Scope &amp; Methodology</h2>
   {{ _ci('scope') }}
+
+  {% if audience == 'executive' %}
+  {# Executive: brief scope statement, no methodology detail #}
+  <p>
+    This assessment was conducted on the systems and services of
+    <strong>{{ project.client_name or "the client" }}</strong>
+    {% if subproject.description %}as described below{% endif %}.
+    {% if rpt_extra.engagement_type %}
+    The engagement type was <strong>{{ rpt_extra.engagement_type|replace("_", " ")|capitalize }}</strong>.
+    {% endif %}
+  </p>
+  {% if rpt_extra.scope %}
+  <p>{{ rpt_extra.scope }}</p>
+  {% elif subproject.description %}
+  <p>{{ subproject.description }}</p>
+  {% endif %}
+
+  {% else %}
+  {# Management / Technical: full scope + methodology #}
   <h3>Scope</h3>
   {% if rpt_extra.scope %}
   <p>{{ rpt_extra.scope }}</p>
@@ -245,6 +360,7 @@
     (Penetration Testing Execution Standard).
   </p>
   {% endif %}
+  {% endif %}{# end audience branch #}
 </div>
 {% endmacro %}
 
@@ -274,20 +390,122 @@
 <div class="page-break">
   <h2>Recommendations</h2>
   {{ _ci('recommendations') }}
+
+  {% if audience == 'executive' %}
+  {# ── EXECUTIVE: strategic, program-level actions ── #}
   <p>
-    Based on the findings of this assessment, the following strategic recommendations
+    To address the security risk identified during this assessment,
+    the following strategic actions are recommended for
+    <strong>{{ project.client_name or "the organization" }}</strong>.
+  </p>
+  <ol style="margin-left:20px; line-height:2.2;">
+    {% if exec_metrics.immediate_action > 0 %}
+    <li>
+      <strong>Immediate risk mitigation</strong> —
+      {{ exec_metrics.immediate_action }} Critical/High finding{{ "s" if exec_metrics.immediate_action != 1 else "" }}
+      require{{ "" if exec_metrics.immediate_action != 1 else "s" }} priority remediation.
+      Assign ownership and set a target resolution date within 30 days.
+    </li>
+    {% endif %}
+    <li>
+      <strong>Establish a remediation programme</strong> —
+      Create a tracked remediation roadmap with clear owners, deadlines,
+      and executive-level reporting on progress.
+    </li>
+    <li>
+      <strong>Invest in continuous security assurance</strong> —
+      Commission periodic assessments (quarterly/annually) and implement
+      continuous monitoring to detect regressions.
+    </li>
+    <li>
+      <strong>Security awareness</strong> —
+      Ensure staff receive regular training appropriate to their role,
+      with particular focus on social engineering and phishing risks.
+    </li>
+    <li>
+      <strong>Governance and policy review</strong> —
+      Validate that security policies, patch management procedures,
+      and access control frameworks align with current risk exposure.
+    </li>
+  </ol>
+
+  {% elif audience == 'management' %}
+  {# ── MANAGEMENT: tactical + prioritised ── #}
+  <p>
+    Based on the findings of this assessment, the following prioritised recommendations
+    are provided for <strong>{{ project.client_name or "the organization" }}</strong>.
+  </p>
+  <table class="rem-table">
+    <thead>
+      <tr><th>Priority</th><th>Recommendation</th><th>Target</th></tr>
+    </thead>
+    <tbody>
+      {% if severity_counts.get('critical', 0) > 0 %}
+      <tr>
+        <td><span class="badge badge-critical">P1 — CRITICAL</span></td>
+        <td>Remediate all Critical severity findings immediately; escalate to engineering leads.</td>
+        <td style="white-space:nowrap;">≤ 7 days</td>
+      </tr>
+      {% endif %}
+      {% if severity_counts.get('high', 0) > 0 %}
+      <tr>
+        <td><span class="badge badge-high">P2 — HIGH</span></td>
+        <td>Address all High severity findings; include in the next sprint or patch cycle.</td>
+        <td style="white-space:nowrap;">≤ 30 days</td>
+      </tr>
+      {% endif %}
+      {% if severity_counts.get('medium', 0) > 0 %}
+      <tr>
+        <td><span class="badge badge-medium">P3 — MEDIUM</span></td>
+        <td>Schedule Medium severity fixes; include in the quarterly patching programme.</td>
+        <td style="white-space:nowrap;">≤ 90 days</td>
+      </tr>
+      {% endif %}
+      <tr>
+        <td>Policy</td>
+        <td>Establish a patch management SLA aligned with severity levels above.</td>
+        <td>Ongoing</td>
+      </tr>
+      <tr>
+        <td>Process</td>
+        <td>Implement continuous monitoring and periodic security reviews.</td>
+        <td>Ongoing</td>
+      </tr>
+      <tr>
+        <td>People</td>
+        <td>Conduct role-appropriate security awareness training for all staff.</td>
+        <td>Quarterly</td>
+      </tr>
+    </tbody>
+  </table>
+
+  {% else %}
+  {# ── TECHNICAL: full technical recommendations ── #}
+  <p>
+    Based on the findings of this assessment, the following recommendations
     are provided to improve the overall security posture of
     <strong>{{ project.client_name or "the organization" }}</strong>.
   </p>
   <ol style="margin-left:20px; line-height:2;">
     {% if severity_counts.get('critical', 0) > 0 or severity_counts.get('high', 0) > 0 %}
-    <li>Prioritize remediation of Critical and High severity vulnerabilities immediately.</li>
+    <li>
+      Prioritize remediation of Critical and High severity vulnerabilities immediately.
+      Refer to the Detailed Findings and Remediation Plan sections for specific guidance.
+    </li>
     {% endif %}
-    <li>Establish a patch management process to keep systems up to date.</li>
-    <li>Implement continuous security monitoring and periodic assessments.</li>
-    <li>Conduct security awareness training for staff.</li>
-    <li>Review and enforce the principle of least privilege across all systems.</li>
+    <li>Establish a patch management process aligned with vendor advisories and CVSS scores.</li>
+    <li>Implement continuous security monitoring (SIEM, IDS/IPS) and schedule periodic assessments.</li>
+    <li>Enforce the principle of least privilege across all systems and service accounts.</li>
+    <li>Conduct security awareness training with emphasis on phishing, credential hygiene, and incident reporting.</li>
+    <li>Integrate security testing (SAST, DAST, dependency scanning) into the CI/CD pipeline.</li>
+    {% if exec_metrics.high_epss > 0 %}
+    <li>
+      Monitor EPSS scores for the {{ exec_metrics.high_epss }} high-exploitation-probability
+      finding{{ "s" if exec_metrics.high_epss != 1 else "" }} and prioritise patching accordingly.
+    </li>
+    {% endif %}
   </ol>
+  {% endif %}{# end audience branch #}
 </div>
 {% endmacro %}
 
@@ -298,6 +516,21 @@
   <h2>Appendices</h2>
   {{ _ci('appendix') }}
 
+  {% if audience == 'executive' %}
+  {# Executive: legal disclaimer only #}
+  {% if org.legal_disclaimer %}
+  <h3>Legal Disclaimer</h3>
+  <p>{{ org.legal_disclaimer }}</p>
+  {% else %}
+  <p style="color:#6b7280;font-style:italic;">
+    This report is prepared for the exclusive use of
+    {{ project.client_name or "the client" }} and {{ org.name }}.
+    Distribution to third parties requires written consent.
+  </p>
+  {% endif %}
+
+  {% else %}
+  {# Management / Technical: full appendix #}
   {% if charts.timeline %}
   <h3>Vulnerability Timeline</h3>
   <img class="chart-img" src="data:image/png;base64,{{ charts.timeline }}" />
@@ -325,5 +558,6 @@
   <h3>Legal Disclaimer</h3>
   <p>{{ org.legal_disclaimer }}</p>
   {% endif %}
+  {% endif %}{# end audience branch #}
 </div>
 {% endmacro %}

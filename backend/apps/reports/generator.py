@@ -233,6 +233,19 @@ REPORT_TYPE_TOOLS: dict[str, dict[str, list[str]]] = {
 }
 
 
+def _overall_risk(severity_counts: dict) -> tuple[str, str]:
+    """Return (risk_label, hex_color) representing the worst finding severity."""
+    for level, color in [
+        ("critical", "#dc2626"),
+        ("high",     "#ea580c"),
+        ("medium",   "#d97706"),
+        ("low",      "#2563eb"),
+    ]:
+        if severity_counts.get(level, 0) > 0:
+            return level.upper(), color
+    return "INFO", "#6b7280"
+
+
 def _make_ci_fn(section_overrides: dict):
     """
     Return a _ci() callable for use as a Jinja2 context variable.
@@ -670,6 +683,13 @@ class ReportGenerator:
 
         section_overrides = self.options.get("section_overrides") or {}
 
+        overall_risk_label, overall_risk_color = _overall_risk(severity_counts)
+        immediate_action = severity_counts.get("critical", 0) + severity_counts.get("high", 0)
+        high_epss = sum(
+            1 for v in vulnerabilities
+            if v.epss_score is not None and v.epss_score >= 0.5
+        )
+
         context = {
             "project":           self.project,
             "subproject":        self.subproject,
@@ -698,6 +718,13 @@ class ReportGenerator:
             "_ci":               _make_ci_fn(section_overrides),
             # Tool coverage guidance shown on cover page (management/technical only)
             "tool_coverage":     self._get_tool_coverage(),
+            # Pre-computed executive metrics (avoid complex Jinja2 calculations)
+            "exec_metrics": {
+                "overall_risk_label": overall_risk_label,
+                "overall_risk_color": overall_risk_color,
+                "immediate_action":   immediate_action,
+                "high_epss":          high_epss,
+            },
         }
 
         template_file = "base.html"

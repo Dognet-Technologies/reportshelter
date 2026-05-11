@@ -2,6 +2,12 @@
    COMPLIANCE / FRAMEWORK MACROS
    Covers: risk_register, compliance_matrix, owasp_coverage,
            masvs_coverage, mitre_mapping, detection_gap
+
+   Audience behaviour:
+     executive   – MITRE and detection_gap are redirected to technical annex;
+                   compliance_matrix and risk_register show summary only
+     management  – full tables, no technical exploit detail
+     technical   – full detail (default)
    ================================================================ #}
 
 {# ── Risk Register ── #}
@@ -20,8 +26,16 @@
 <div class="page-break">
   <h2>Compliance Matrix</h2>
   {{ _ci('compliance_matrix') }}
+  {% if audience == 'executive' %}
+  <p>
+    A control-by-control compliance mapping is provided in the management and technical
+    versions of this report. The overall compliance posture is reflected in the risk
+    summary above.
+  </p>
+  {% else %}
   <p>Control-by-control compliance status.</p>
   <p style="color:#6b7280;font-style:italic;">No compliance matrix data for this sub-project.</p>
+  {% endif %}
 </div>
 {% endmacro %}
 
@@ -90,6 +104,16 @@
 <div class="page-break">
   <h2>MITRE ATT&amp;CK Mapping</h2>
   {{ _ci('mitre_mapping') }}
+
+  {% if audience == 'executive' %}
+  <p>
+    MITRE ATT&amp;CK tactic and technique mapping is available in the technical
+    annex of this report. The mapping supports threat modelling and detection
+    engineering activities within the security operations team.
+  </p>
+
+  {% else %}
+  {# Management / Technical: full mapping table #}
   <p>
     The following table maps findings to MITRE ATT&amp;CK tactics and techniques
     to support threat modelling and detection engineering.
@@ -113,6 +137,7 @@
   <p style="color:#6b7280;font-size:8.5pt;margin-top:8px;">
     MITRE technique mapping requires manual annotation by the assessor.
   </p>
+  {% endif %}{# end audience branch #}
 </div>
 {% endmacro %}
 
@@ -122,6 +147,15 @@
 <div class="page-break">
   <h2>Detection Gap Analysis</h2>
   {{ _ci('detection_gap') }}
+
+  {% if audience == 'executive' %}
+  <p>
+    Detection gap analysis findings are detailed in the technical annex.
+    Where detection gaps exist, the security operations team should be engaged
+    to review monitoring coverage for the identified attack techniques.
+  </p>
+
+  {% else %}
   <p>
     This section highlights areas where the organization's detection and response
     capabilities may be insufficient to identify or contain the identified threats.
@@ -144,5 +178,6 @@
   <p style="color:#6b7280;font-size:8.5pt;margin-top:8px;">
     Detection gap assessment requires input from the client's SOC/detection engineering team.
   </p>
+  {% endif %}{# end audience branch #}
 </div>
 {% endmacro %}

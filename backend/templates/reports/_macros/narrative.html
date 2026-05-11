@@ -2,6 +2,12 @@
    NARRATIVE / ATTACK MACROS
    Covers: attack_timeline, attack_narrative, attack_paths, ioc,
            diff_retest, network_overview, cloud_posture_overview
+
+   Audience behaviour:
+     executive   – attack_paths shows business-impact summary of
+                   critical entry points; others show high-level note
+     management  – tabular view without raw technical output
+     technical   – full detail (default)
    ================================================================ #}
 
 {# ── Attack Timeline ── #}
@@ -9,8 +15,15 @@
 <div class="page-break">
   <h2>Attack Timeline</h2>
   {{ _ci('attack_timeline') }}
+  {% if audience == 'executive' %}
+  <p>
+    A chronological timeline of the engagement activities is provided in the
+    technical version of this report.
+  </p>
+  {% else %}
   <p>Chronological narrative of attack steps and adversary activity during the engagement.</p>
   <p style="color:#6b7280;font-style:italic;">No timeline data recorded for this sub-project.</p>
+  {% endif %}
 </div>
 {% endmacro %}
 
@@ -20,6 +33,13 @@
 <div class="page-break">
   <h2>Attack Narrative</h2>
   {{ _ci('attack_narrative') }}
+  {% if audience == 'executive' %}
+  <p>
+    A detailed narrative of the attack chain is available in the technical annex.
+    The assessment successfully demonstrated {{ exec_metrics.immediate_action }}
+    critical or high-impact attack path{{ "s" if exec_metrics.immediate_action != 1 else "" }}.
+  </p>
+  {% else %}
   <p>
     This section describes the attack chain and exploitation path followed during the engagement,
     from initial access through to the final objective.
@@ -27,6 +47,7 @@
   <p style="color:#6b7280;font-style:italic;">
     Detailed attack narrative to be completed by the assessor based on engagement notes.
   </p>
+  {% endif %}
 </div>
 {% endmacro %}
 
@@ -36,6 +57,41 @@
 <div class="page-break">
   <h2>Attack Paths</h2>
   {{ _ci('attack_paths') }}
+
+  {% if audience == 'executive' %}
+  {# Executive: business-impact summary of critical entry points only #}
+  {% set critical_high = vulnerabilities|selectattr("risk_level", "in", ["critical", "high"])|list %}
+  <p>
+    The assessment identified <strong>{{ critical_high|length }}</strong>
+    high-risk entry point{{ "s" if critical_high|length != 1 else "" }} that could
+    be leveraged by an attacker to compromise systems or data. The most impactful
+    are summarised below. Full technical detail is provided in the technical annex.
+  </p>
+  {% if critical_high %}
+  <table class="vuln-table">
+    <thead><tr><th>Entry Point</th><th>Risk</th><th>Business Impact</th></tr></thead>
+    <tbody>
+      {% for v in critical_high[:5] %}
+      <tr>
+        <td>{{ v.affected_host or "—" }}{% if v.affected_port %}:{{ v.affected_port }}{% endif %}</td>
+        <td><span class="badge badge-{{ v.risk_level }}">{{ v.risk_level|upper }}</span></td>
+        <td>{{ v.title[:80] }}</td>
+      </tr>
+      {% endfor %}
+      {% if critical_high|length > 5 %}
+      <tr><td colspan="3" style="color:#6b7280;font-style:italic;">
+        … and {{ critical_high|length - 5 }} additional high-risk finding{{ "s" if (critical_high|length - 5) != 1 else "" }}.
+        See technical report for full details.
+      </td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+  {% else %}
+  <p style="color:#2563eb;">No Critical or High severity attack paths identified.</p>
+  {% endif %}
+
+  {% else %}
+  {# Management / Technical: full attack paths table #}
   <p>
     Potential and observed attack paths identified during the assessment,
     including lateral movement vectors and privilege escalation routes.
@@ -58,6 +114,7 @@
     </tbody>
   </table>
   {% endif %}
+  {% endif %}{# end audience branch #}
 </div>
 {% endmacro %}
 
@@ -67,8 +124,15 @@
 <div class="page-break">
   <h2>Indicators of Compromise</h2>
   {{ _ci('ioc') }}
+  {% if audience == 'executive' %}
+  <p>
+    A full list of Indicators of Compromise (IoCs) including IP addresses, domains,
+    file hashes, and TTPs is provided in the technical annex of this report.
+  </p>
+  {% else %}
   <p>IoCs, TTPs, threat indicators, and file hashes identified during the engagement.</p>
   <p style="color:#6b7280;font-style:italic;">No IoC data recorded for this sub-project.</p>
+  {% endif %}
 </div>
 {% endmacro %}
 
@@ -80,7 +144,7 @@
   {{ _ci('diff_retest') }}
   <p>Comparison of current findings against the previous assessment.</p>
   {% if charts.fixed_vs_open %}
-  <div class="chart-full" style="margin-bottom:16px;">
+  <div class="chart-{{ 'half' if audience == 'executive' else 'full' }}" style="margin-bottom:16px;">
     <img class="chart-img" src="data:image/png;base64,{{ charts.fixed_vs_open }}" />
   </div>
   {% endif %}
@@ -103,14 +167,23 @@
   {% if hosts %}
   <h3>Discovered Hosts</h3>
   <table class="vuln-table">
-    <thead><tr><th>Host</th><th>Total Findings</th><th>Critical</th><th>High</th></tr></thead>
+    <thead>
+      <tr>
+        <th>Host</th><th>Total Findings</th><th>Critical</th><th>High</th>
+        {% if audience == 'technical' %}<th>Medium</th><th>Low</th>{% endif %}
+      </tr>
+    </thead>
     <tbody>
       {% for host_name, host_vulns in hosts.items() %}
       <tr>
         <td>{{ host_name }}</td>
         <td>{{ host_vulns|length }}</td>
-        <td>{{ host_vulns|selectattr("risk_level", "equalto", "critical")|list|length }}</td>
-        <td>{{ host_vulns|selectattr("risk_level", "equalto", "high")|list|length }}</td>
+        <td style="color:#dc2626;font-weight:bold;">{{ host_vulns|selectattr("risk_level", "equalto", "critical")|list|length }}</td>
+        <td style="color:#ea580c;font-weight:bold;">{{ host_vulns|selectattr("risk_level", "equalto", "high")|list|length }}</td>
+        {% if audience == 'technical' %}
+        <td>{{ host_vulns|selectattr("risk_level", "equalto", "medium")|list|length }}</td>
+        <td>{{ host_vulns|selectattr("risk_level", "equalto", "low")|list|length }}</td>
+        {% endif %}
       </tr>
       {% endfor %}
     </tbody>
@@ -127,6 +200,7 @@
   {{ _ci('cloud_posture_overview') }}
   <p>High-level assessment of cloud infrastructure security posture across assessed services.</p>
   {% if vulnerabilities %}
+  {% if audience != 'executive' %}
   <div class="chart-grid">
     {% if charts.vulns_by_category %}
     <div class="chart-full">
@@ -134,8 +208,14 @@
     </div>
     {% endif %}
   </div>
+  {% endif %}
   <table class="vuln-table">
-    <thead><tr><th>#</th><th>Service / Resource</th><th>Finding</th><th>Severity</th><th>Status</th></tr></thead>
+    <thead>
+      <tr>
+        <th>#</th><th>Service / Resource</th><th>Finding</th><th>Severity</th>
+        {% if audience != 'executive' %}<th>Status</th>{% endif %}
+      </tr>
+    </thead>
     <tbody>
       {% for v in vulnerabilities %}
       <tr>
@@ -143,7 +223,9 @@
         <td>{{ v.affected_host or "—" }}</td>
         <td>{{ v.title }}</td>
         <td><span class="badge badge-{{ v.risk_level }}">{{ v.risk_level|upper }}</span></td>
+        {% if audience != 'executive' %}
         <td>{{ v.vuln_status|replace("_", " ")|capitalize }}</td>
+        {% endif %}
       </tr>
       {% endfor %}
     </tbody>
