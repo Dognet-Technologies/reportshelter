@@ -15,8 +15,55 @@
 <div class="page-break">
   <h2>Risk Register</h2>
   {{ _ci('risk_register') }}
-  <p>Risk catalog with risk acceptance decisions.</p>
+  <p>Risk catalog with risk acceptance decisions and ownership.</p>
+  {% if risk_entries %}
+  <table class="vuln-table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Risk</th>
+        <th>Level</th>
+        {% if audience != 'executive' %}<th>Likelihood</th><th>Impact</th>{% endif %}
+        <th>Status</th>
+        {% if audience != 'executive' %}<th>Owner</th><th>Target Date</th>{% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in risk_entries %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td>
+          {{ r.title }}
+          {% if r.description and audience == 'technical' %}
+          <br/><span style="font-size:8.5pt;color:#6b7280;">{{ r.description[:150] }}</span>
+          {% endif %}
+        </td>
+        <td><span class="badge badge-{{ r.risk_level }}">{{ r.risk_level|upper }}</span></td>
+        {% if audience != 'executive' %}
+        <td style="text-align:center;">{{ r.likelihood or "—" }}</td>
+        <td style="text-align:center;">{{ r.impact or "—" }}</td>
+        {% endif %}
+        <td>{{ r.get_status_display() }}</td>
+        {% if audience != 'executive' %}
+        <td>{{ r.owner or "—" }}</td>
+        <td style="white-space:nowrap;font-size:8.5pt;">{{ r.target_date|format_date if r.target_date else "—" }}</td>
+        {% endif %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if audience == 'technical' %}
+  {# Technical: show mitigation notes for entries that have them #}
+  {% for r in risk_entries if r.mitigation %}
+  <div style="margin-bottom:8px;font-size:9pt;">
+    <strong>{{ loop.index }}. {{ r.title }}</strong> —
+    <span style="color:#374151;">{{ r.mitigation }}</span>
+  </div>
+  {% endfor %}
+  {% endif %}
+  {% else %}
   <p style="color:#6b7280;font-style:italic;">No risk register entries for this sub-project.</p>
+  {% endif %}
 </div>
 {% endmacro %}
 
@@ -31,10 +78,67 @@
     A control-by-control compliance mapping is provided in the management and technical
     versions of this report. The overall compliance posture is reflected in the risk
     summary above.
+    {% if compliance_controls %}
+    {% set non_compliant = compliance_controls|selectattr("status", "equalto", "non_compliant")|list %}
+    {% set partial = compliance_controls|selectattr("status", "equalto", "partial")|list %}
+    Of <strong>{{ compliance_controls|length }}</strong> controls assessed,
+    <strong>{{ non_compliant|length }}</strong> are non-compliant and
+    <strong>{{ partial|length }}</strong> are partially compliant.
+    {% endif %}
   </p>
   {% else %}
-  <p>Control-by-control compliance status.</p>
+  <p>Control-by-control compliance status against assessed frameworks.</p>
+  {% if compliance_controls %}
+  {# Group by framework for better readability #}
+  {% set frameworks = compliance_controls|map(attribute='framework')|unique|list %}
+  {% for fw in frameworks %}
+  {% set fw_controls = compliance_controls|selectattr('framework', 'equalto', fw)|list %}
+  <h3>{{ fw }}</h3>
+  <table class="vuln-table">
+    <thead>
+      <tr>
+        <th>Control ID</th>
+        <th>Control Name</th>
+        <th>Status</th>
+        {% if audience == 'technical' %}<th>Findings</th><th>Evidence</th>{% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for ctrl in fw_controls %}
+      <tr>
+        <td style="white-space:nowrap;font-family:monospace;font-size:8.5pt;">{{ ctrl.control_id }}</td>
+        <td>
+          {{ ctrl.control_name }}
+          {% if ctrl.notes and audience == 'technical' %}
+          <br/><span style="font-size:8.5pt;color:#6b7280;">{{ ctrl.notes[:150] }}</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if ctrl.status == 'compliant' %}
+            <span style="color:#16a34a;font-weight:bold;">✓ Compliant</span>
+          {% elif ctrl.status == 'non_compliant' %}
+            <span style="color:#dc2626;font-weight:bold;">✗ Non-Compliant</span>
+          {% elif ctrl.status == 'partial' %}
+            <span style="color:#d97706;font-weight:bold;">⚠ Partial</span>
+          {% else %}
+            <span style="color:#6b7280;">— Not Assessed</span>
+          {% endif %}
+        </td>
+        {% if audience == 'technical' %}
+        <td style="font-size:8.5pt;">
+          {% set linked = ctrl.findings.all() %}
+          {% if linked %}{{ linked|length }} finding{{ "s" if linked|length != 1 else "" }}{% else %}—{% endif %}
+        </td>
+        <td style="font-size:8.5pt;color:#6b7280;">{{ ctrl.evidence[:100] if ctrl.evidence else "—" }}</td>
+        {% endif %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endfor %}
+  {% else %}
   <p style="color:#6b7280;font-style:italic;">No compliance matrix data for this sub-project.</p>
+  {% endif %}
   {% endif %}
 </div>
 {% endmacro %}
@@ -118,6 +222,35 @@
     The following table maps findings to MITRE ATT&amp;CK tactics and techniques
     to support threat modelling and detection engineering.
   </p>
+  {% set mapped = vulnerabilities|selectattr("mitre_technique_id")|list %}
+  {% set unmapped = vulnerabilities|rejectattr("mitre_technique_id")|list %}
+  {% if mapped %}
+  <table class="vuln-table">
+    <thead><tr><th>#</th><th>Finding</th><th>Tactic</th><th>Technique</th><th>Severity</th></tr></thead>
+    <tbody>
+      {% for v in mapped %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td>{{ v.title[:60] }}</td>
+        <td style="font-size:8.5pt;">{{ v.mitre_tactic or "—" }}</td>
+        <td style="font-size:8.5pt;font-family:monospace;">
+          {{ v.mitre_technique_id }}
+          {% if v.mitre_technique_name %}
+          <br/><span style="font-family:sans-serif;color:#6b7280;">{{ v.mitre_technique_name[:50] }}</span>
+          {% endif %}
+        </td>
+        <td><span class="badge badge-{{ v.risk_level }}">{{ v.risk_level|upper }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if unmapped %}
+  <p style="color:#6b7280;font-size:8.5pt;margin-top:4px;">
+    {{ unmapped|length }} finding{{ "s" if unmapped|length != 1 else "" }} without MITRE mapping
+    (manual annotation required).
+  </p>
+  {% endif %}
+  {% else %}
   <table class="vuln-table">
     <thead><tr><th>#</th><th>Finding</th><th>Tactic</th><th>Technique</th><th>Severity</th></tr></thead>
     <tbody>
@@ -135,8 +268,9 @@
     </tbody>
   </table>
   <p style="color:#6b7280;font-size:8.5pt;margin-top:8px;">
-    MITRE technique mapping requires manual annotation by the assessor.
+    MITRE technique mapping requires manual annotation by the assessor or parser enrichment.
   </p>
+  {% endif %}
   {% endif %}{# end audience branch #}
 </div>
 {% endmacro %}

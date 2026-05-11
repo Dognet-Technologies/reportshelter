@@ -14,7 +14,15 @@ from django.conf import settings
 from django.db import models
 
 from apps.vulnerabilities.deduplication import build_timeline
-from apps.vulnerabilities.models import RISK_LEVEL_ORDER, ScanImport, Vulnerability
+from apps.vulnerabilities.models import (
+    RISK_LEVEL_ORDER,
+    ComplianceControl,
+    EngagementEvent,
+    IndicatorOfCompromise,
+    RiskEntry,
+    ScanImport,
+    Vulnerability,
+)
 
 from .charts import (
     cvss_breakdown_chart,
@@ -433,6 +441,33 @@ class ReportGenerator:
         content = set(sections) - _STRUCTURAL_SECTIONS
         return content if content else ALL_SECTIONS
 
+    def _get_engagement_events(self) -> list:
+        return list(
+            EngagementEvent.objects.filter(subproject=self.subproject)
+            .select_related("vulnerability")
+            .order_by("order", "timestamp", "created_at")
+        )
+
+    def _get_iocs(self) -> list:
+        return list(
+            IndicatorOfCompromise.objects.filter(subproject=self.subproject)
+            .order_by("ioc_type", "value")
+        )
+
+    def _get_risk_entries(self) -> list:
+        return list(
+            RiskEntry.objects.filter(subproject=self.subproject)
+            .select_related("vulnerability")
+            .order_by("risk_level", "title")
+        )
+
+    def _get_compliance_controls(self) -> list:
+        return list(
+            ComplianceControl.objects.filter(subproject=self.subproject)
+            .prefetch_related("findings")
+            .order_by("framework", "control_id")
+        )
+
     def _get_tool_coverage(self) -> dict:
         """
         Return which tools have been imported for this subproject and how they compare
@@ -687,10 +722,14 @@ class ReportGenerator:
         report_type_label = REPORT_TYPE_LABELS.get(report_type, "Security Assessment Report")
         audience          = self.options.get("audience", "technical")
 
-        rpt_style = self._build_rpt_style()
-        rpt_extra = self._build_rpt_extra()
-        charts    = self._build_charts(sections, vulnerabilities, audience=audience)
-        hosts     = self._build_hosts_breakdown(vulnerabilities)
+        rpt_style          = self._build_rpt_style()
+        rpt_extra          = self._build_rpt_extra()
+        charts             = self._build_charts(sections, vulnerabilities, audience=audience)
+        hosts              = self._build_hosts_breakdown(vulnerabilities)
+        engagement_events  = self._get_engagement_events()
+        iocs               = self._get_iocs()
+        risk_entries       = self._get_risk_entries()
+        compliance_controls= self._get_compliance_controls()
 
         section_overrides = self.options.get("section_overrides") or {}
 
@@ -721,6 +760,11 @@ class ReportGenerator:
             "audience":          audience,
             # Pre-grouped data
             "hosts":             hosts,
+            # Narrative / compliance data models
+            "engagement_events":   engagement_events,
+            "iocs":                iocs,
+            "risk_entries":        risk_entries,
+            "compliance_controls": compliance_controls,
             # Per-section custom intro text (kept for legacy access; _ci() is preferred)
             "section_overrides": section_overrides,
             # _ci() renders user-authored custom intro text for a section;

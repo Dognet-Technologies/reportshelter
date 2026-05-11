@@ -19,10 +19,52 @@
   <p>
     A chronological timeline of the engagement activities is provided in the
     technical version of this report.
+    {% if engagement_events %}
+    The engagement recorded <strong>{{ engagement_events|length }}</strong>
+    notable event{{ "s" if engagement_events|length != 1 else "" }} across
+    the assessment phases.
+    {% endif %}
   </p>
   {% else %}
   <p>Chronological narrative of attack steps and adversary activity during the engagement.</p>
+  {% if engagement_events %}
+  <table class="vuln-table">
+    <thead>
+      <tr>
+        <th>Timestamp</th>
+        <th>Phase</th>
+        <th>Event</th>
+        {% if audience == 'technical' %}<th>Tool</th><th>Host</th>{% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for ev in engagement_events %}
+      <tr>
+        <td style="white-space:nowrap;font-size:8.5pt;color:#6b7280;">
+          {{ ev.timestamp.strftime('%Y-%m-%d %H:%M') if ev.timestamp else "—" }}
+        </td>
+        <td>
+          <span style="font-size:8pt;font-weight:bold;color:{{ rpt_style.secondary_color }};">
+            {{ ev.get_phase_display() }}
+          </span>
+        </td>
+        <td>
+          <strong>{{ ev.title }}</strong>
+          {% if ev.description and audience == 'technical' %}
+          <br/><span style="font-size:8.5pt;color:#6b7280;">{{ ev.description[:200] }}</span>
+          {% endif %}
+        </td>
+        {% if audience == 'technical' %}
+        <td>{{ ev.tool_used or "—" }}</td>
+        <td>{{ ev.affected_host or "—" }}</td>
+        {% endif %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
   <p style="color:#6b7280;font-style:italic;">No timeline data recorded for this sub-project.</p>
+  {% endif %}
   {% endif %}
 </div>
 {% endmacro %}
@@ -128,10 +170,50 @@
   <p>
     A full list of Indicators of Compromise (IoCs) including IP addresses, domains,
     file hashes, and TTPs is provided in the technical annex of this report.
+    {% if iocs %}
+    This engagement identified <strong>{{ iocs|length }}</strong> IoC{{ "s" if iocs|length != 1 else "" }}.
+    {% endif %}
   </p>
   {% else %}
   <p>IoCs, TTPs, threat indicators, and file hashes identified during the engagement.</p>
+  {% if iocs %}
+  <table class="vuln-table">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Value</th>
+        {% if audience == 'technical' %}<th>Confidence</th><th>Source</th><th>MITRE</th>{% endif %}
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ioc in iocs %}
+      <tr>
+        <td style="white-space:nowrap;">
+          <span style="font-size:8pt;font-weight:bold;color:{{ rpt_style.secondary_color }};">
+            {{ ioc.get_ioc_type_display() }}
+          </span>
+        </td>
+        <td style="font-family:monospace;font-size:8.5pt;word-break:break-all;">{{ ioc.value }}</td>
+        {% if audience == 'technical' %}
+        <td>
+          {% if ioc.confidence %}
+          <span style="color:{% if ioc.confidence=='high' %}#dc2626{% elif ioc.confidence=='medium' %}#d97706{% else %}#2563eb{% endif %};">
+            {{ ioc.confidence|capitalize }}
+          </span>
+          {% else %}—{% endif %}
+        </td>
+        <td>{{ ioc.source or "—" }}</td>
+        <td style="font-size:8.5pt;">{{ ioc.mitre_technique or "—" }}</td>
+        {% endif %}
+        <td style="font-size:8.5pt;color:#6b7280;">{{ ioc.description[:120] if ioc.description else "—" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
   <p style="color:#6b7280;font-style:italic;">No IoC data recorded for this sub-project.</p>
+  {% endif %}
   {% endif %}
 </div>
 {% endmacro %}

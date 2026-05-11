@@ -256,6 +256,20 @@ class Vulnerability(models.Model):
     # Evidence
     evidence_code = models.TextField(blank=True, help_text="Raw output / code snippet as evidence")
 
+    # MITRE ATT&CK mapping (manual or parser-populated)
+    mitre_tactic = models.CharField(
+        max_length=128, blank=True,
+        help_text="ATT&CK Tactic name, e.g. 'Initial Access'",
+    )
+    mitre_technique_id = models.CharField(
+        max_length=32, blank=True,
+        help_text="ATT&CK Technique ID, e.g. 'T1190'",
+    )
+    mitre_technique_name = models.CharField(
+        max_length=255, blank=True,
+        help_text="ATT&CK Technique name, e.g. 'Exploit Public-Facing Application'",
+    )
+
     # Screenshots are linked via Screenshot.vulnerability_ref
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -362,3 +376,216 @@ class Vulnerability(models.Model):
         if self.cvss_score is not None or self.epss_score is not None:
             self.risk_score = self.compute_risk_score()
         super().save(*args, **kwargs)
+
+
+class EngagementEvent(models.Model):
+    """
+    A chronological event recorded during the engagement (for Attack Timeline).
+    Events can be linked to an ATT&CK phase and optionally to a Vulnerability.
+    """
+
+    class Phase(models.TextChoices):
+        RECON            = "recon",                 "Reconnaissance"
+        INITIAL_ACCESS   = "initial_access",        "Initial Access"
+        EXECUTION        = "execution",             "Execution"
+        PERSISTENCE      = "persistence",           "Persistence"
+        PRIV_ESC         = "privilege_escalation",  "Privilege Escalation"
+        DEFENSE_EVASION  = "defense_evasion",       "Defense Evasion"
+        CREDENTIAL_ACCESS= "credential_access",     "Credential Access"
+        DISCOVERY        = "discovery",             "Discovery"
+        LATERAL_MOVEMENT = "lateral_movement",      "Lateral Movement"
+        COLLECTION       = "collection",            "Collection"
+        EXFILTRATION     = "exfiltration",          "Exfiltration"
+        IMPACT           = "impact",                "Impact"
+        OTHER            = "other",                 "Other"
+
+    subproject = models.ForeignKey(
+        "projects.SubProject",
+        on_delete=models.CASCADE,
+        related_name="engagement_events",
+    )
+    vulnerability = models.ForeignKey(
+        Vulnerability,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="engagement_events",
+    )
+
+    timestamp    = models.DateTimeField(null=True, blank=True)
+    phase        = models.CharField(max_length=32, choices=Phase.choices, default=Phase.OTHER)
+    title        = models.CharField(max_length=255)
+    description  = models.TextField(blank=True)
+    tool_used    = models.CharField(max_length=128, blank=True)
+    affected_host= models.CharField(max_length=255, blank=True)
+    order        = models.PositiveSmallIntegerField(default=0, help_text="Manual sort order")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Engagement Event"
+        verbose_name_plural = "Engagement Events"
+        ordering = ["order", "timestamp", "created_at"]
+
+    def __str__(self) -> str:
+        ts = self.timestamp.strftime("%Y-%m-%d %H:%M") if self.timestamp else "—"
+        return f"[{self.phase}] {self.title} ({ts})"
+
+
+class IndicatorOfCompromise(models.Model):
+    """
+    IoC entries for the Indicators of Compromise report section.
+    Covers network indicators, file artifacts, credential indicators, and TTPs.
+    """
+
+    class IndicatorType(models.TextChoices):
+        IP           = "ip",           "IP Address"
+        DOMAIN       = "domain",       "Domain"
+        URL          = "url",          "URL"
+        FILE_HASH    = "file_hash",    "File Hash"
+        EMAIL        = "email",        "Email Address"
+        USER_AGENT   = "user_agent",   "User Agent"
+        REGISTRY_KEY = "registry_key", "Registry Key"
+        MUTEX        = "mutex",        "Mutex"
+        TTP          = "ttp",          "MITRE TTP"
+        OTHER        = "other",        "Other"
+
+    class Confidence(models.TextChoices):
+        HIGH   = "high",   "High"
+        MEDIUM = "medium", "Medium"
+        LOW    = "low",    "Low"
+
+    subproject = models.ForeignKey(
+        "projects.SubProject",
+        on_delete=models.CASCADE,
+        related_name="iocs",
+    )
+
+    ioc_type        = models.CharField(max_length=16, choices=IndicatorType.choices, default=IndicatorType.OTHER)
+    value           = models.CharField(max_length=1024, help_text="The raw IoC value (IP, hash, domain, etc.)")
+    description     = models.TextField(blank=True)
+    confidence      = models.CharField(max_length=8, choices=Confidence.choices, blank=True)
+    source          = models.CharField(max_length=128, blank=True, help_text="Tool or assessor that identified this IoC")
+    mitre_technique = models.CharField(max_length=64, blank=True, help_text="Related ATT&CK technique ID")
+    first_seen      = models.DateTimeField(null=True, blank=True)
+    last_seen       = models.DateTimeField(null=True, blank=True)
+    tags            = models.JSONField(default=list)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Indicator of Compromise"
+        verbose_name_plural = "Indicators of Compromise"
+        ordering = ["ioc_type", "value"]
+
+    def __str__(self) -> str:
+        return f"[{self.ioc_type}] {self.value[:80]}"
+
+
+class RiskEntry(models.Model):
+    """
+    Risk register entry — tracks accepted, mitigated, or open risks for a SubProject.
+    """
+
+    class RiskLevel(models.TextChoices):
+        CRITICAL = "critical", "Critical"
+        HIGH     = "high",     "High"
+        MEDIUM   = "medium",   "Medium"
+        LOW      = "low",      "Low"
+
+    class RiskStatus(models.TextChoices):
+        OPEN        = "open",        "Open"
+        ACCEPTED    = "accepted",    "Accepted"
+        MITIGATED   = "mitigated",   "Mitigated"
+        TRANSFERRED = "transferred", "Transferred"
+
+    subproject = models.ForeignKey(
+        "projects.SubProject",
+        on_delete=models.CASCADE,
+        related_name="risk_entries",
+    )
+    vulnerability = models.ForeignKey(
+        Vulnerability,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="risk_entries",
+        help_text="Linked finding (optional — risk may be independent of a specific vuln)",
+    )
+
+    title       = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    risk_level  = models.CharField(max_length=16, choices=RiskLevel.choices, default=RiskLevel.MEDIUM)
+    likelihood  = models.IntegerField(
+        null=True, blank=True,
+        validators=[models.MinValueValidator(1), models.MaxValueValidator(5)],
+    )
+    impact      = models.IntegerField(
+        null=True, blank=True,
+        validators=[models.MinValueValidator(1), models.MaxValueValidator(5)],
+    )
+    status      = models.CharField(max_length=16, choices=RiskStatus.choices, default=RiskStatus.OPEN)
+    owner       = models.CharField(max_length=255, blank=True)
+    mitigation  = models.TextField(blank=True)
+    target_date = models.DateField(null=True, blank=True)
+
+    created_at  = models.DateTimeField(auto_now_add=True)
+    updated_at  = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Risk Entry"
+        verbose_name_plural = "Risk Entries"
+        ordering = [
+            Case(
+                When(risk_level="critical", then=Value(0)),
+                When(risk_level="high",     then=Value(1)),
+                When(risk_level="medium",   then=Value(2)),
+                When(risk_level="low",      then=Value(3)),
+                default=Value(4),
+                output_field=IntegerField(),
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"[{self.risk_level.upper()}] {self.title}"
+
+
+class ComplianceControl(models.Model):
+    """
+    A single compliance framework control assessed during the engagement.
+    Multiple findings (Vulnerabilities) can be linked to one control.
+    """
+
+    class ControlStatus(models.TextChoices):
+        COMPLIANT     = "compliant",     "Compliant"
+        NON_COMPLIANT = "non_compliant", "Non-Compliant"
+        PARTIAL       = "partial",       "Partial"
+        NOT_ASSESSED  = "not_assessed",  "Not Assessed"
+
+    subproject = models.ForeignKey(
+        "projects.SubProject",
+        on_delete=models.CASCADE,
+        related_name="compliance_controls",
+    )
+    findings = models.ManyToManyField(
+        Vulnerability,
+        blank=True,
+        related_name="compliance_controls",
+    )
+
+    framework    = models.CharField(max_length=64, help_text="e.g. PCI-DSS, ISO 27001, NIST CSF")
+    control_id   = models.CharField(max_length=64, help_text="e.g. 6.3.1, A.12.6.1, PR.AC-1")
+    control_name = models.CharField(max_length=255)
+    description  = models.TextField(blank=True)
+    status       = models.CharField(max_length=16, choices=ControlStatus.choices, default=ControlStatus.NOT_ASSESSED)
+    evidence     = models.TextField(blank=True)
+    notes        = models.TextField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Compliance Control"
+        verbose_name_plural = "Compliance Controls"
+        ordering = ["framework", "control_id"]
+
+    def __str__(self) -> str:
+        return f"[{self.framework}] {self.control_id} — {self.control_name}"
