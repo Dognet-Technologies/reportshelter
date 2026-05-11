@@ -27,12 +27,15 @@ from apps.vulnerabilities.models import (
 from .charts import (
     cvss_breakdown_chart,
     epss_distribution_chart,
+    epss_vs_cvss_chart,
     fixed_vs_open_chart,
     host_bar_chart,
+    kev_status_chart,
     remediation_effort_chart,
     risk_gauge_chart,
     risk_matrix_chart,
     severity_pie_chart,
+    sources_coverage_chart,
     timeline_chart,
     vulns_by_category_chart,
     vulns_per_host_chart,
@@ -627,6 +630,9 @@ class ReportGenerator:
             "cvss_breakdown": "",
             "epss_distribution": "",
             "vulns_per_host": "",
+            "kev_status": "",
+            "epss_vs_cvss": "",
+            "sources_coverage": "",
         }
 
         summary_active = bool({"executive_summary", "risk_summary", "findings_summary"} & sections)
@@ -700,6 +706,20 @@ class ReportGenerator:
         # Frontend key: "vuln_by_host"
         if (vuln_active or "host_breakdown" in sections) and is_on("vuln_by_host"):
             charts["vulns_per_host"] = vulns_per_host_chart(
+                vulnerabilities, audience=audience
+            )
+
+        # --- kev_status ---
+        if (summary_active or vuln_active) and is_on("kev_status"):
+            charts["kev_status"] = kev_status_chart(vulnerabilities, audience=audience)
+
+        # --- epss_vs_cvss ---
+        if vuln_active and is_on("epss_vs_cvss"):
+            charts["epss_vs_cvss"] = epss_vs_cvss_chart(vulnerabilities, audience=audience)
+
+        # --- sources_coverage ---
+        if (summary_active or vuln_active) and is_on("sources_coverage"):
+            charts["sources_coverage"] = sources_coverage_chart(
                 vulnerabilities, audience=audience
             )
 

@@ -149,8 +149,12 @@ def enrich_vulnerabilities_with_nvd(self, vulnerability_ids: list[int]) -> dict:
             if cve and cve.strip():
                 unique_cves.setdefault(cve.strip(), []).append(v)
 
-    # ── Step 1: CVSS from NVD ──────────────────────────────────────────────────
+    # ── Step 1: CVSS + KEV + published date from NVD ──────────────────────────
+    from datetime import date as _date
+
     cvss_map: dict[str, tuple[float, str]] = {}   # cve_id → (score, vector)
+    kev_map: dict[str, bool] = {}                  # cve_id → is_kev
+    published_map: dict[str, _date] = {}           # cve_id → cve_published
     failed_cves: list[str] = []
 
     for cve_id in unique_cves:
@@ -177,6 +181,18 @@ def enrich_vulnerabilities_with_nvd(self, vulnerability_ids: list[int]) -> dict:
                             cvss_vector = getattr(cvss_data, "vectorString", "") or ""
                         if cvss_score is not None:
                             break
+
+            # KEV status (CISA Known Exploited Vulnerabilities)
+            kev_map[cve_id] = bool(getattr(cve_obj, "cisaExploitAdd", None))
+
+            # CVE publication date
+            published_raw = getattr(cve_obj, "published", None)
+            if published_raw:
+                try:
+                    pub_str = str(published_raw)[:10]
+                    published_map[cve_id] = _date.fromisoformat(pub_str)
+                except (ValueError, TypeError):
+                    pass
 
             if cvss_score is not None:
                 cvss_map[cve_id] = (float(cvss_score), cvss_vector)
@@ -227,6 +243,8 @@ def enrich_vulnerabilities_with_nvd(self, vulnerability_ids: list[int]) -> dict:
     for cve_id, cve_vulns in unique_cves.items():
         cvss_entry = cvss_map.get(cve_id)
         epss_val = epss_map.get(cve_id)
+        is_kev = kev_map.get(cve_id, False)
+        pub_date = published_map.get(cve_id)
 
         for v in cve_vulns:
             changed = False
@@ -236,15 +254,21 @@ def enrich_vulnerabilities_with_nvd(self, vulnerability_ids: list[int]) -> dict:
             if epss_val is not None and v.epss_score is None:
                 v.epss_score = epss_val
                 changed = True
+            if is_kev and not v.is_kev:
+                v.is_kev = True
+                changed = True
+            if pub_date and v.cve_published is None:
+                v.cve_published = pub_date
+                changed = True
             if changed:
-                # Recompute composite risk score
                 v.risk_score = v.compute_risk_score()
                 to_update.append(v)
                 enriched_count += 1
 
     if to_update:
         Vulnerability.objects.bulk_update(
-            to_update, ["cvss_score", "cvss_vector", "epss_score", "risk_score"]
+            to_update,
+            ["cvss_score", "cvss_vector", "epss_score", "risk_score", "is_kev", "cve_published"],
         )
 
     result = {

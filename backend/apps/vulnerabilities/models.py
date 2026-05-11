@@ -236,6 +236,15 @@ class Vulnerability(models.Model):
         choices=EnrichmentStatus.choices,
         default=EnrichmentStatus.PENDING,
     )
+    is_kev = models.BooleanField(
+        default=False,
+        help_text="True if listed in the CISA Known Exploited Vulnerabilities catalog.",
+    )
+    cve_published = models.DateField(
+        null=True,
+        blank=True,
+        help_text="CVE publication date from NVD (populated by enrichment task).",
+    )
 
     # Deduplication
     sources = models.JSONField(

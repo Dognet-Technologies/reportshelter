@@ -22,6 +22,18 @@ import numpy as np
 
 matplotlib.use("Agg")  # Non-interactive backend (no display required)
 
+# Professional report style: minimal spines, clean grid, readable font size
+matplotlib.rcParams.update({
+    "axes.spines.top": False,
+    "axes.spines.right": False,
+    "axes.grid": True,
+    "grid.alpha": 0.28,
+    "grid.linestyle": "--",
+    "font.size": 10,
+    "figure.facecolor": "white",
+    "axes.facecolor": "white",
+})
+
 AudienceLevel = str  # "executive" | "management" | "technical"
 
 SEVERITY_COLORS = {
@@ -44,7 +56,7 @@ EFFORT_COLORS = {
 def _fig_to_base64(fig: plt.Figure) -> str:
     """Convert a matplotlib figure to a base64-encoded PNG string."""
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", bbox_inches="tight", dpi=150, transparent=False)
+    fig.savefig(buf, format="png", bbox_inches="tight", dpi=220, transparent=False)
     buf.seek(0)
     data = base64.b64encode(buf.read()).decode("utf-8")
     plt.close(fig)
@@ -781,5 +793,197 @@ def vulns_per_host_chart(
     ax.set_title(f"Vulnerabilities per Host (Top {limit})", fontsize=13)
     ax.legend()
     ax.grid(True, axis="y", linestyle="--", alpha=0.3)
+    fig.tight_layout()
+    return _fig_to_base64(fig)
+
+
+# ---------------------------------------------------------------------------
+# 12. kev_status  (CISA Known Exploited Vulnerabilities breakdown)
+# ---------------------------------------------------------------------------
+
+def kev_status_chart(
+    vulnerabilities: list,
+    audience: AudienceLevel = "technical",
+) -> str:
+    """
+    Shows the proportion of findings present in the CISA KEV catalog
+    (actively exploited in the wild).
+
+    Audience behaviour:
+      executive   — simple donut: KEV vs non-KEV with percentage labels
+      management  — grouped bar by severity (KEV vs non-KEV)
+      technical   — grouped bar by severity with count annotations
+
+    Returns empty string if no KEV findings exist (chart only when relevant).
+    Returns base64-encoded PNG.
+    """
+    kev_vulns     = [v for v in vulnerabilities if getattr(v, "is_kev", False)]
+    non_kev_vulns = [v for v in vulnerabilities if not getattr(v, "is_kev", False)]
+    kev_count = len(kev_vulns)
+
+    if kev_count == 0:
+        return ""
+
+    total = len(vulnerabilities)
+
+    if audience == "executive":
+        # Simple donut
+        sizes = [kev_count, total - kev_count]
+        colors = ["#dc2626", "#94a3b8"]
+        fig, ax = plt.subplots(figsize=(5, 4), subplot_kw={"aspect": "equal"})
+        wedges, texts, autotexts = ax.pie(
+            sizes,
+            labels=[f"KEV\n({kev_count})", f"Non-KEV\n({total - kev_count})"],
+            colors=colors,
+            autopct=lambda p: f"{p:.0f}%",
+            startangle=90,
+            pctdistance=0.75,
+        )
+        for at in autotexts:
+            at.set_fontsize(9)
+        centre_circle = plt.Circle((0, 0), 0.55, fc="white")
+        ax.add_artist(centre_circle)
+    else:
+        # Grouped bar by severity
+        severities = [s for s in SEVERITY_ORDER
+                      if any(v.risk_level == s for v in vulnerabilities)]
+        kev_by_sev     = Counter(v.risk_level for v in kev_vulns)
+        non_kev_by_sev = Counter(v.risk_level for v in non_kev_vulns)
+
+        x = np.arange(len(severities))
+        width = 0.38
+        fig, ax = plt.subplots(figsize=(max(6, len(severities) * 1.2 + 2), 5))
+        bars_kev = ax.bar(
+            x - width / 2,
+            [kev_by_sev.get(s, 0) for s in severities],
+            width, label="KEV (Actively Exploited)", color="#dc2626", alpha=0.85,
+        )
+        bars_non = ax.bar(
+            x + width / 2,
+            [non_kev_by_sev.get(s, 0) for s in severities],
+            width, label="Non-KEV", color="#94a3b8", alpha=0.85,
+        )
+        if audience == "technical":
+            for bar in (*bars_kev, *bars_non):
+                h = bar.get_height()
+                if h > 0:
+                    ax.text(bar.get_x() + bar.get_width() / 2, h + 0.1, str(int(h)),
+                            ha="center", va="bottom", fontsize=8)
+        ax.set_xticks(x)
+        ax.set_xticklabels([s.capitalize() for s in severities])
+        ax.set_ylabel("Count")
+        ax.legend()
+
+    ax.set_title(
+        f"CISA KEV Status — {kev_count} of {total} findings actively exploited",
+        fontsize=12,
+    )
+    fig.tight_layout()
+    return _fig_to_base64(fig)
+
+
+# ---------------------------------------------------------------------------
+# 13. epss_vs_cvss  (scatter: CVSS score × EPSS probability)
+# ---------------------------------------------------------------------------
+
+def epss_vs_cvss_chart(
+    vulnerabilities: list,
+    audience: AudienceLevel = "technical",
+) -> str:
+    """
+    Scatter plot: CVSS score (X-axis, 0-10) vs EPSS exploit probability (Y-axis, 0-1).
+    Each point is coloured by severity. The top-right quadrant (high CVSS + high EPSS)
+    is highlighted as the critical priority zone.
+
+    Only meaningful for management and technical audiences.
+    Requires at least 2 vulnerabilities with both scores.
+
+    Returns base64-encoded PNG.
+    """
+    if audience == "executive":
+        return ""
+
+    points = [
+        (v.cvss_score, v.epss_score, v.risk_level)
+        for v in vulnerabilities
+        if v.cvss_score is not None and v.epss_score is not None
+    ]
+    if len(points) < 2:
+        return ""
+
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    # Danger-zone quadrant: CVSS ≥ 7 AND EPSS ≥ 0.1
+    ax.axvline(7.0, color="#e5e7eb", linewidth=1.2, linestyle="--", zorder=1)
+    ax.axhline(0.1, color="#e5e7eb", linewidth=1.2, linestyle="--", zorder=1)
+    ax.fill_between([7, 10], 0.1, 1.0, alpha=0.06, color="#dc2626", zorder=0)
+    ax.text(8.5, 0.88, "Priority\nZone", ha="center", va="center",
+            fontsize=8, color="#dc2626", alpha=0.55, style="italic")
+
+    # Plot each severity group
+    for sev in SEVERITY_ORDER:
+        pts = [(c, e) for c, e, s in points if s == sev]
+        if pts:
+            xs, ys = zip(*pts)
+            ax.scatter(xs, ys, color=SEVERITY_COLORS[sev], label=sev.capitalize(),
+                       alpha=0.72, s=55, zorder=3)
+
+    ax.set_xlabel("CVSS Score (0–10)", fontsize=11)
+    ax.set_ylabel("EPSS Exploit Probability (0–1)", fontsize=11)
+    ax.set_xlim(0, 10)
+    ax.set_ylim(0, 1)
+    ax.legend(loc="upper left", fontsize=9)
+    ax.set_title("CVSS × EPSS Risk Positioning", fontsize=13)
+    fig.tight_layout()
+    return _fig_to_base64(fig)
+
+
+# ---------------------------------------------------------------------------
+# 14. sources_coverage  (findings per scanner tool)
+# ---------------------------------------------------------------------------
+
+def sources_coverage_chart(
+    vulnerabilities: list,
+    audience: AudienceLevel = "technical",
+) -> str:
+    """
+    Horizontal bar chart showing how many findings each scanner tool contributed.
+    Built from the `sources` JSON field populated by the deduplication pipeline.
+
+    Audience behaviour:
+      executive   — not rendered (no value to executives)
+      management  — top 8 tools, count annotations
+      technical   — top 10 tools, count annotations
+
+    Returns empty string if fewer than 2 tools are present.
+    Returns base64-encoded PNG.
+    """
+    if audience == "executive":
+        return ""
+
+    tool_counts: Counter = Counter()
+    for v in vulnerabilities:
+        for src in (v.sources or []):
+            if src:
+                tool_counts[str(src)] += 1
+
+    if len(tool_counts) < 2:
+        return ""
+
+    limit = 8 if audience == "management" else 10
+    sorted_tools = tool_counts.most_common(limit)
+    tools  = [t for t, _ in sorted_tools]
+    counts = [c for _, c in sorted_tools]
+
+    fig, ax = plt.subplots(figsize=(8, max(4, len(tools) * 0.45 + 1)))
+    bars = ax.barh(tools, counts, color="#6366f1", alpha=0.85)
+    ax.set_xlabel("Number of Findings")
+    ax.set_title(f"Detection Coverage by Scanner Tool (Top {len(tools)})", fontsize=13)
+    ax.invert_yaxis()
+
+    for bar, count in zip(bars, counts):
+        ax.text(bar.get_width() + 0.1, bar.get_y() + bar.get_height() / 2,
+                str(count), va="center", fontsize=9)
+
     fig.tight_layout()
     return _fig_to_base64(fig)

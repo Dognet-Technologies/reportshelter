@@ -30,6 +30,16 @@
     </div>
     {% endif %}
   </div>
+  {% if charts.kev_status %}
+  <div class="chart-full" style="margin-bottom:16px;">
+    <img class="chart-img" src="data:image/png;base64,{{ charts.kev_status }}" />
+  </div>
+  {% endif %}
+  {% if charts.sources_coverage %}
+  <div class="chart-full" style="margin-bottom:16px;">
+    <img class="chart-img" src="data:image/png;base64,{{ charts.sources_coverage }}" />
+  </div>
+  {% endif %}
   {% if audience == 'technical' %}
   <div class="chart-grid">
     {% if charts.cvss_breakdown %}
@@ -43,6 +53,11 @@
     </div>
     {% endif %}
   </div>
+  {% if charts.epss_vs_cvss %}
+  <div class="chart-full" style="margin-bottom:16px;">
+    <img class="chart-img" src="data:image/png;base64,{{ charts.epss_vs_cvss }}" />
+  </div>
+  {% endif %}
   {% if charts.vulns_per_host %}
   <div class="chart-full" style="margin-bottom:16px;">
     <img class="chart-img" src="data:image/png;base64,{{ charts.vulns_per_host }}" />
@@ -101,17 +116,22 @@
       &nbsp;
       <span class="badge badge-{{ v.risk_level }}">{{ v.risk_level|upper }}</span>
       {% if v.is_recurring %}<span class="badge badge-recurring">RECURRING</span>{% endif %}
-      {% if v.cve_id %}<span style="font-size:9pt;color:#6b7280;margin-left:8px;">{{ v.cve_id }}</span>{% endif %}
+      {% if v.is_kev %}<span class="badge badge-kev">&#9888; KEV</span>{% endif %}
+      {% if v.cve_id %}
+      <span style="font-size:9pt;color:#6b7280;margin-left:8px;font-family:monospace;">
+        {{ v.cve_id|join(", ") if v.cve_id is iterable and v.cve_id is not string else v.cve_id }}
+      </span>
+      {% endif %}
     </div>
     <div class="vuln-card-body">
       <div class="vuln-meta">
         {% if v.affected_host    %}<span><strong>Host:</strong> {{ v.affected_host }}</span>{% endif %}
         {% if v.affected_port    %}<span><strong>Port:</strong> {{ v.affected_port }}</span>{% endif %}
         {% if v.affected_service %}<span><strong>Service:</strong> {{ v.affected_service }}</span>{% endif %}
-        {# CVSS/EPSS — management and technical only #}
-        {% if audience == 'technical' %}
+        {# CVSS/EPSS — management sees scores, technical sees full detail #}
+        {% if audience in ['technical', 'management'] %}
           {% if v.cvss_score is not none %}<span><strong>CVSS:</strong> <span style="color:{{ v.cvss_score|cvss_color }}">{{ "%.1f"|format(v.cvss_score) }}</span></span>{% endif %}
-          {% if v.epss_score is not none %}<span><strong>EPSS:</strong> {{ "%.2f%%"|format(v.epss_score * 100) }}</span>{% endif %}
+          {% if v.epss_score is not none %}<span><strong>EPSS:</strong> {{ "%.1f%%"|format(v.epss_score * 100) }}</span>{% endif %}
         {% endif %}
         {% if v.sources %}<span><strong>Detected by:</strong> {{ v.sources|join(", ") }}</span>{% endif %}
       </div>

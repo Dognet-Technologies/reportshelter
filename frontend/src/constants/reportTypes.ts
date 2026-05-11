@@ -339,6 +339,9 @@ export const CHARTS: ChartDef[] = [
   { id: "cvss_radar",        label: "CVSS Breakdown",         icon: "🕸️", desc: "CVSS vector components (AV/AC/PR/UI/…)",    section: "Technical",  variants: ["Radar"],               defaultVariant: "Radar",           recommendedFor: ["pentest","va","web_app","cloud","network"] },
   { id: "epss_distribution", label: "EPSS Distribution",      icon: "🎲", desc: "Exploit probability distribution",           section: "Technical",  variants: ["Histogram","Bar"],     defaultVariant: "Histogram",       recommendedFor: ["pentest","va","threat_intel","patch_mgmt"] },
   { id: "vuln_by_host",      label: "Vulns per Host",         icon: "🔢", desc: "Breakdown of findings per IP/hostname",      section: "Technical",  variants: ["Bar","Treemap"],       defaultVariant: "Bar",             recommendedFor: ["pentest","va","network","cloud","it_infra"] },
+  { id: "kev_status",       label: "CISA KEV Status",        icon: "⚠️", desc: "Known Exploited Vulnerabilities breakdown",   section: "Technical",  variants: ["Bar","Donut"],         defaultVariant: "Bar",             recommendedFor: ["pentest","va","patch_mgmt","network","red_team"] },
+  { id: "epss_vs_cvss",     label: "EPSS × CVSS Scatter",   icon: "🎯", desc: "Risk positioning: CVSS severity vs exploit probability", section: "Technical", variants: ["Scatter"], defaultVariant: "Scatter",        recommendedFor: ["pentest","va","threat_intel","patch_mgmt","network"] },
+  { id: "sources_coverage", label: "Detection Coverage",    icon: "🔬", desc: "Findings count by scanner/tool",               section: "Results",    variants: ["Bar"],                 defaultVariant: "Bar",             recommendedFor: ["pentest","va","network","cloud","it_infra"] },
 ];
 
 // ─── Audience-aware chart config ──────────────────────────────────────────────
@@ -380,6 +383,9 @@ export const REPORT_TYPE_CHARTS: Partial<Record<ReportTypeId, Record<string, Cha
     cvss_radar:         { enabledFor: ["technical"] },
     epss_distribution:  { enabledFor: ["management","technical"] },
     vuln_by_host:       { enabledFor: ["management","technical"] },
+    kev_status:         { enabledFor: ["management","technical"] },
+    epss_vs_cvss:       { enabledFor: ["technical"] },
+    sources_coverage:   { enabledFor: ["management","technical"] },
   },
 
   // ── 2. Penetration Test ───────────────────────────────────────────────────
@@ -395,6 +401,9 @@ export const REPORT_TYPE_CHARTS: Partial<Record<ReportTypeId, Record<string, Cha
     cvss_radar:         { enabledFor: ["technical"] },
     epss_distribution:  { enabledFor: ["management","technical"] },
     vuln_by_host:       { enabledFor: ["technical"] },
+    kev_status:         { enabledFor: ["management","technical"] },
+    epss_vs_cvss:       { enabledFor: ["technical"] },
+    sources_coverage:   { enabledFor: ["management","technical"] },
   },
 
   // ── 3. Web Application Security ──────────────────────────────────────────
@@ -425,6 +434,9 @@ export const REPORT_TYPE_CHARTS: Partial<Record<ReportTypeId, Record<string, Cha
     cvss_radar:         { enabledFor: ["technical"] },
     epss_distribution:  { enabledFor: ["technical"] },
     vuln_by_host:       { enabledFor: ["management","technical"] },              // dominant chart for network reports
+    kev_status:         { enabledFor: ["management","technical"] },
+    epss_vs_cvss:       { enabledFor: ["technical"] },
+    sources_coverage:   { enabledFor: ["management","technical"] },
   },
 
   // ── 5. Cloud Security Assessment ─────────────────────────────────────────
@@ -665,6 +677,9 @@ export const REPORT_TYPE_CHARTS: Partial<Record<ReportTypeId, Record<string, Cha
     cvss_radar:         { enabledFor: ["technical"] },
     epss_distribution:  { enabledFor: ["management","technical"] },              // EPSS for CVEs in pending patches
     vuln_by_host:       { enabledFor: [], notApplicable: true },                 // top_hosts_bar covers this
+    kev_status:         { enabledFor: ["executive","management","technical"] },  // critical for patch mgmt — known exploited first
+    epss_vs_cvss:       { enabledFor: ["management","technical"] },
+    sources_coverage:   { enabledFor: [], notApplicable: true },
   },
 
   // ── 20. Compliance Gap Assessment ────────────────────────────────────────
@@ -766,6 +781,14 @@ export const REPORT_TYPE_CHARTS: Partial<Record<ReportTypeId, Record<string, Cha
     vuln_by_host:       { enabledFor: [], notApplicable: true },
   },
 };
+
+/**
+ * Fallback chart config used when no report type is selected.
+ * All charts start enabled so the user sees the full set.
+ */
+export const DEFAULT_CHARTS_ENABLED: Record<string, boolean> = Object.fromEntries(
+  CHARTS.map((c) => [c.id, true]),
+);
 
 /**
  * Returns the default enabled/disabled state for all charts,

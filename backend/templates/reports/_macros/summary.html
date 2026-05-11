@@ -325,6 +325,16 @@
     <img class="chart-img" src="data:image/png;base64,{{ charts.fixed_vs_open }}" />
   </div>
   {% endif %}
+  {% if audience != 'executive' and charts.kev_status %}
+  <div class="chart-full">
+    <img class="chart-img" src="data:image/png;base64,{{ charts.kev_status }}" />
+  </div>
+  {% endif %}
+  {% if audience != 'executive' and charts.sources_coverage %}
+  <div class="chart-full">
+    <img class="chart-img" src="data:image/png;base64,{{ charts.sources_coverage }}" />
+  </div>
+  {% endif %}
 </div>
 {% endmacro %}
 
