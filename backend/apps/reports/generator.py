@@ -14,7 +14,7 @@ from django.conf import settings
 from django.db import models
 
 from apps.vulnerabilities.deduplication import build_timeline
-from apps.vulnerabilities.models import RISK_LEVEL_ORDER, Vulnerability
+from apps.vulnerabilities.models import RISK_LEVEL_ORDER, ScanImport, Vulnerability
 
 from .charts import (
     cvss_breakdown_chart,
@@ -85,6 +85,180 @@ ALL_SECTIONS: set[str] = {
 # Sections always rendered in the template regardless of user selection.
 # They must not be counted when deciding whether to fall back to ALL_SECTIONS.
 _STRUCTURAL_SECTIONS = frozenset({"cover", "last_page"})
+
+
+# ---------------------------------------------------------------------------
+# Tool guidance — maps each report type to the tools that feed it.
+# "required":    primary data sources; report is incomplete without them.
+# "recommended": significantly improve coverage and chart quality.
+# "optional":    supplementary; narrow scope or specialist use.
+# Tool IDs match ScanImport.Tool choices.
+# ---------------------------------------------------------------------------
+REPORT_TYPE_TOOLS: dict[str, dict[str, list[str]]] = {
+    "pentest": {
+        "required":    ["nmap"],
+        "recommended": ["burp", "zap", "nikto", "metasploit", "nessus"],
+        "optional":    ["hydra", "wfuzz", "nuclei", "gitleaks", "sslscan", "ssh_audit", "openvas"],
+    },
+    "va": {
+        "required":    ["nessus", "openvas", "nexpose", "qualys"],
+        "recommended": ["nmap", "nuclei"],
+        "optional":    ["ssh_audit", "sslscan", "qualys_webapp"],
+    },
+    "red_team": {
+        "required":    ["metasploit", "cobalt"],
+        "recommended": ["nmap", "hydra", "gitleaks"],
+        "optional":    ["pentest_pipeline", "wfuzz", "nuclei"],
+    },
+    "web_app": {
+        "required":    ["burp", "zap", "acunetix", "netsparker"],
+        "recommended": ["nikto", "wapiti", "nuclei", "qualys_webapp"],
+        "optional":    ["wfuzz", "wpscan", "immuniweb", "arachni"],
+    },
+    "mobile_app": {
+        "required":    [],
+        "recommended": ["nuclei"],
+        "optional":    ["csv"],
+    },
+    "cloud": {
+        "required":    ["aws_inspector2", "awssecurityhub", "cloudsploit"],
+        "recommended": ["trivy", "nuclei"],
+        "optional":    ["nmap", "dockerbench"],
+    },
+    "network": {
+        "required":    ["nmap"],
+        "recommended": ["nessus", "nexpose", "qualys", "ssh_audit", "sslscan"],
+        "optional":    ["openvas", "nuclei"],
+    },
+    "social_eng": {
+        "required":    [],
+        "recommended": ["csv"],
+        "optional":    [],
+    },
+    "incident": {
+        "required":    ["sysdig"],
+        "recommended": ["gitleaks"],
+        "optional":    ["csv"],
+    },
+    "threat_intel": {
+        "required":    [],
+        "recommended": ["pentest_pipeline", "csv"],
+        "optional":    ["cycognito"],
+    },
+    "compliance": {
+        "required":    ["nessus", "qualys", "awssecurityhub", "dockerbench"],
+        "recommended": ["redhatsatellite", "nuclei"],
+        "optional":    ["nmap", "openvas"],
+    },
+    "osint": {
+        "required":    ["pentest_pipeline", "cycognito"],
+        "recommended": ["nuclei", "nmap"],
+        "optional":    [],
+    },
+    "executive": {
+        "required":    [],
+        "recommended": [],
+        "optional":    [],
+    },
+    "it_infra": {
+        "required":    ["nmap"],
+        "recommended": ["nessus", "nexpose", "ssh_audit", "sslscan"],
+        "optional":    ["redhatsatellite", "qualys"],
+    },
+    "code_review": {
+        "required":    ["sonarqube", "codechecker", "github_vulnerability"],
+        "recommended": ["gitleaks", "cargo_audit"],
+        "optional":    ["gitlab_container_scan", "trivy"],
+    },
+    "arch_review": {
+        "required":    [],
+        "recommended": ["csv"],
+        "optional":    [],
+    },
+    "dr": {
+        "required":    [],
+        "recommended": ["csv"],
+        "optional":    [],
+    },
+    "it_audit": {
+        "required":    ["nessus", "qualys", "dockerbench"],
+        "recommended": ["redhatsatellite", "github_vulnerability"],
+        "optional":    ["nmap"],
+    },
+    "remediation": {
+        "required":    [],
+        "recommended": [],
+        "optional":    [],
+    },
+    "retest": {
+        "required":    [],
+        "recommended": [],
+        "optional":    [],
+    },
+    "risk_register": {
+        "required":    [],
+        "recommended": [],
+        "optional":    [],
+    },
+    "patch_mgmt": {
+        "required":    ["nessus", "nexpose", "qualys", "redhatsatellite"],
+        "recommended": ["github_vulnerability"],
+        "optional":    ["nmap"],
+    },
+    "breach": {
+        "required":    ["gitleaks", "hydra"],
+        "recommended": ["sysdig"],
+        "optional":    ["csv"],
+    },
+    "forensic": {
+        "required":    ["sysdig"],
+        "recommended": ["gitleaks"],
+        "optional":    ["csv"],
+    },
+    "malware": {
+        "required":    ["sysdig", "trivy"],
+        "recommended": [],
+        "optional":    ["csv"],
+    },
+    "lessons_learned": {
+        "required":    [],
+        "recommended": ["csv"],
+        "optional":    [],
+    },
+    "attack_surface": {
+        "required":    ["nmap", "cycognito"],
+        "recommended": ["nuclei", "pentest_pipeline"],
+        "optional":    ["sslscan", "ssh_audit", "nessus"],
+    },
+}
+
+
+def _make_ci_fn(section_overrides: dict):
+    """
+    Return a _ci() callable for use as a Jinja2 context variable.
+    Renders the user-authored custom intro block for a section (if any),
+    returning safe Markup so Jinja2 does not double-escape the HTML.
+    """
+    from markupsafe import Markup
+
+    def _nl2br(text: str) -> str:
+        escaped = (
+            str(text)
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace('"', "&quot;")
+        )
+        return escaped.replace("\n", "<br/>\n")
+
+    def _ci(sid: str) -> Markup:
+        ov = section_overrides.get(sid, {})
+        ct = ov.get("custom_text", "") if isinstance(ov, dict) else ""
+        if ct:
+            return Markup(f'<div class="section-custom-intro">{_nl2br(ct)}</div>')
+        return Markup("")
+
+    return _ci
 
 
 class ReportGenerator:
@@ -245,6 +419,50 @@ class ReportGenerator:
         sections = self.options.get("sections") or []
         content = set(sections) - _STRUCTURAL_SECTIONS
         return content if content else ALL_SECTIONS
+
+    def _get_tool_coverage(self) -> dict:
+        """
+        Return which tools have been imported for this subproject and how they compare
+        to the recommended/required tool set for the chosen report type.
+        """
+        report_type = self.options.get("report_type", "")
+        tool_config = REPORT_TYPE_TOOLS.get(report_type, {})
+        tool_label_map = dict(ScanImport.Tool.choices)
+
+        imports = list(
+            ScanImport.objects.filter(
+                subproject=self.subproject,
+                status=ScanImport.Status.DONE,
+            ).values("tool", "vulnerability_count")
+        )
+
+        tool_counts: dict[str, int] = {}
+        for imp in imports:
+            t = imp["tool"]
+            tool_counts[t] = tool_counts.get(t, 0) + imp["vulnerability_count"]
+
+        imported = [
+            {
+                "tool": t,
+                "tool_label": tool_label_map.get(t, t.upper()),
+                "vuln_count": count,
+            }
+            for t, count in sorted(tool_counts.items(), key=lambda x: x[1], reverse=True)
+        ]
+
+        imported_ids = set(tool_counts.keys())
+        required_ids = set(tool_config.get("required", []))
+        recommended_ids = set(tool_config.get("recommended", []))
+
+        required_missing = [tool_label_map.get(t, t) for t in (required_ids - imported_ids)]
+        recommended_missing = [tool_label_map.get(t, t) for t in (recommended_ids - imported_ids)]
+
+        return {
+            "imported_tools":      imported,
+            "required_missing":    sorted(required_missing),
+            "recommended_missing": sorted(recommended_missing),
+            "coverage_ok":         not required_missing,
+        }
 
     def _build_hosts_breakdown(self, vulnerabilities: list[Vulnerability]) -> dict[str, list[Vulnerability]]:
         """Group vulnerabilities by affected_host, sorted by count desc."""
@@ -450,6 +668,8 @@ class ReportGenerator:
         charts    = self._build_charts(sections, vulnerabilities, audience=audience)
         hosts     = self._build_hosts_breakdown(vulnerabilities)
 
+        section_overrides = self.options.get("section_overrides") or {}
+
         context = {
             "project":           self.project,
             "subproject":        self.subproject,
@@ -470,8 +690,14 @@ class ReportGenerator:
             "audience":          audience,
             # Pre-grouped data
             "hosts":             hosts,
-            # Per-section custom intro text
-            "section_overrides": self.options.get("section_overrides") or {},
+            # Per-section custom intro text (kept for legacy access; _ci() is preferred)
+            "section_overrides": section_overrides,
+            # _ci() renders user-authored custom intro text for a section;
+            # passed as a Python callable so all imported macros can use it
+            # without needing their own Jinja2 imports.
+            "_ci":               _make_ci_fn(section_overrides),
+            # Tool coverage guidance shown on cover page (management/technical only)
+            "tool_coverage":     self._get_tool_coverage(),
         }
 
         template_file = "base.html"

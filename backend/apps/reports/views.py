@@ -201,3 +201,210 @@ class ReportExportListView(APIView):
         return Response(
             ReportExportSerializer(qs, many=True, context={"request": request}).data
         )
+
+
+class ReportPresetsView(APIView):
+    """
+    GET /api/v1/reports/presets/?report_type=<type>&audience=<audience>
+
+    Returns recommended sections, chart defaults, and tool guidance for a
+    given report_type × audience combination.  Used by the frontend Report
+    Builder to pre-populate sensible defaults when the user picks a type.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    # Sections recommended per report_type × audience.
+    # Falls back to _AUDIENCE_DEFAULTS when a type-specific override is absent.
+    _AUDIENCE_DEFAULTS: dict[str, list[str]] = {
+        "executive": [
+            "toc", "executive_summary", "recommendations", "appendix",
+        ],
+        "management": [
+            "toc", "doc_control", "executive_summary", "findings_summary",
+            "remediation_plan", "risk_register", "recommendations",
+        ],
+        "technical": [
+            "toc", "doc_control", "scope", "engagement_overview",
+            "vuln_details", "host_breakdown", "remediation_plan",
+            "mitre_mapping", "appendix",
+        ],
+    }
+
+    _TYPE_SECTIONS: dict[str, dict[str, list[str]]] = {
+        "pentest": {
+            "executive": ["toc", "executive_summary", "recommendations"],
+            "management": [
+                "toc", "doc_control", "executive_summary", "findings_summary",
+                "remediation_plan", "risk_register", "recommendations",
+            ],
+            "technical": [
+                "toc", "doc_control", "scope", "engagement_overview",
+                "vuln_details", "host_breakdown", "attack_paths",
+                "attack_narrative", "remediation_plan", "appendix",
+            ],
+        },
+        "va": {
+            "technical": [
+                "toc", "doc_control", "scope", "engagement_overview",
+                "vuln_details", "host_breakdown", "remediation_plan",
+                "risk_register", "appendix",
+            ],
+        },
+        "web_app": {
+            "technical": [
+                "toc", "doc_control", "scope", "engagement_overview",
+                "owasp_coverage", "vuln_details", "host_breakdown",
+                "remediation_plan", "appendix",
+            ],
+        },
+        "mobile_app": {
+            "technical": [
+                "toc", "doc_control", "scope", "engagement_overview",
+                "masvs_coverage", "vuln_details", "remediation_plan", "appendix",
+            ],
+        },
+        "red_team": {
+            "technical": [
+                "toc", "doc_control", "scope", "engagement_overview",
+                "attack_timeline", "attack_narrative", "attack_paths",
+                "ioc", "vuln_details", "remediation_plan", "mitre_mapping", "appendix",
+            ],
+        },
+        "cloud": {
+            "technical": [
+                "toc", "doc_control", "scope", "cloud_posture_overview",
+                "vuln_details", "host_breakdown", "remediation_plan",
+                "compliance_matrix", "appendix",
+            ],
+        },
+        "network": {
+            "technical": [
+                "toc", "doc_control", "scope", "engagement_overview",
+                "network_overview", "vuln_details", "host_breakdown",
+                "remediation_plan", "appendix",
+            ],
+        },
+        "code_review": {
+            "technical": [
+                "toc", "doc_control", "scope", "engagement_overview",
+                "vuln_details", "owasp_coverage", "remediation_plan", "appendix",
+            ],
+        },
+        "osint": {
+            "technical": [
+                "toc", "doc_control", "scope", "passive_recon", "web_surface",
+                "content_discovery", "digital_footprint", "credential_exposure",
+                "osint_findings", "recommendations", "appendix",
+            ],
+        },
+        "compliance": {
+            "management": [
+                "toc", "doc_control", "scope", "compliance_matrix",
+                "risk_register", "remediation_plan", "recommendations",
+            ],
+            "technical": [
+                "toc", "doc_control", "scope", "engagement_overview",
+                "compliance_matrix", "owasp_coverage", "vuln_details",
+                "remediation_plan", "appendix",
+            ],
+        },
+        "incident": {
+            "technical": [
+                "toc", "doc_control", "scope", "attack_timeline",
+                "ioc", "vuln_details", "remediation_plan", "appendix",
+            ],
+        },
+        "forensic": {
+            "technical": [
+                "toc", "doc_control", "scope", "attack_timeline",
+                "ioc", "credential_exposure", "digital_footprint", "appendix",
+            ],
+        },
+        "attack_surface": {
+            "technical": [
+                "toc", "doc_control", "scope", "passive_recon", "web_surface",
+                "network_overview", "vuln_details", "host_breakdown",
+                "remediation_plan", "appendix",
+            ],
+        },
+        "patch_mgmt": {
+            "management": [
+                "toc", "doc_control", "findings_summary", "remediation_plan",
+                "risk_register", "recommendations",
+            ],
+        },
+        "retest": {
+            "technical": [
+                "toc", "doc_control", "scope", "diff_retest",
+                "vuln_details", "remediation_plan", "appendix",
+            ],
+        },
+    }
+
+    # Chart defaults per audience (technical gets everything; less as audience rises)
+    _AUDIENCE_CHARTS: dict[str, dict[str, bool]] = {
+        "executive": {
+            "severity_donut": True,
+            "risk_gauge": True,
+        },
+        "management": {
+            "severity_donut": True,
+            "risk_gauge": True,
+            "top_hosts_bar": True,
+            "remediation_effort": True,
+            "fixed_vs_open": True,
+        },
+        "technical": {
+            "severity_donut": True,
+            "risk_gauge": True,
+            "top_hosts_bar": True,
+            "risk_matrix": True,
+            "vuln_by_category": True,
+            "remediation_effort": True,
+            "fixed_vs_open": True,
+            "cvss_radar": True,
+            "epss_distribution": True,
+            "vuln_by_host": True,
+            "trend_line": True,
+        },
+    }
+
+    def get(self, request: Request) -> Response:
+        from .generator import REPORT_TYPE_LABELS, REPORT_TYPE_TOOLS
+        from apps.vulnerabilities.models import ScanImport
+
+        report_type = request.query_params.get("report_type", "")
+        audience = request.query_params.get("audience", "technical")
+        if audience not in self._AUDIENCE_DEFAULTS:
+            audience = "technical"
+
+        # Sections
+        type_overrides = self._TYPE_SECTIONS.get(report_type, {})
+        sections = (
+            type_overrides.get(audience)
+            or self._AUDIENCE_DEFAULTS.get(audience, self._AUDIENCE_DEFAULTS["technical"])
+        )
+
+        # Charts
+        charts_enabled = self._AUDIENCE_CHARTS.get(audience, self._AUDIENCE_CHARTS["technical"])
+
+        # Tools
+        tool_config = REPORT_TYPE_TOOLS.get(report_type, {})
+        tool_label_map = dict(ScanImport.Tool.choices)
+
+        def _labeled(ids: list[str]) -> list[dict]:
+            return [{"id": t, "label": tool_label_map.get(t, t)} for t in ids]
+
+        return Response({
+            "report_type":       report_type,
+            "report_type_label": REPORT_TYPE_LABELS.get(report_type, "Security Assessment Report"),
+            "audience":          audience,
+            "sections":          sections,
+            "charts_enabled":    charts_enabled,
+            "tools": {
+                "required":    _labeled(tool_config.get("required", [])),
+                "recommended": _labeled(tool_config.get("recommended", [])),
+                "optional":    _labeled(tool_config.get("optional", [])),
+            },
+        })

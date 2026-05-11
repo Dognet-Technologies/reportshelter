@@ -1,0 +1,172 @@
+{# ================================================================
+   VULNERABILITY MACROS
+   Covers: vuln_details, host_breakdown, remediation_plan
+   ================================================================ #}
+
+{# ── Vulnerability Details (overview table + detailed cards) ── #}
+{% macro mac_vuln_details() %}
+<div class="page-break">
+  <h2>Vulnerability Overview</h2>
+  {{ _ci('vuln_details') }}
+  <div class="chart-grid">
+    {% if charts.vulns_by_category %}
+    <div class="chart-half">
+      <img class="chart-img" src="data:image/png;base64,{{ charts.vulns_by_category }}" />
+    </div>
+    {% endif %}
+    {% if charts.remediation_effort %}
+    <div class="chart-half">
+      <img class="chart-img" src="data:image/png;base64,{{ charts.remediation_effort }}" />
+    </div>
+    {% endif %}
+  </div>
+  <div class="chart-grid">
+    {% if charts.cvss_breakdown %}
+    <div class="chart-half">
+      <img class="chart-img" src="data:image/png;base64,{{ charts.cvss_breakdown }}" />
+    </div>
+    {% endif %}
+    {% if charts.epss_distribution %}
+    <div class="chart-half">
+      <img class="chart-img" src="data:image/png;base64,{{ charts.epss_distribution }}" />
+    </div>
+    {% endif %}
+  </div>
+  {% if charts.vulns_per_host %}
+  <div class="chart-full" style="margin-bottom:16px;">
+    <img class="chart-img" src="data:image/png;base64,{{ charts.vulns_per_host }}" />
+  </div>
+  {% endif %}
+  {% if vulnerabilities %}
+  <table class="vuln-table">
+    <thead>
+      <tr>
+        <th>#</th><th>Title</th><th>Host</th><th>Port</th>
+        <th>Severity</th><th>CVSS</th><th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for v in vulnerabilities %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td>
+          {{ v.title }}
+          {% if v.is_recurring %}<span class="badge badge-recurring">RECURRING</span>{% endif %}
+        </td>
+        <td>{{ v.affected_host or "—" }}</td>
+        <td>{{ v.affected_port or "—" }}</td>
+        <td><span class="badge badge-{{ v.risk_level }}">{{ v.risk_level|upper }}</span></td>
+        <td>{{ "%.1f"|format(v.cvss_score) if v.cvss_score is not none else "—" }}</td>
+        <td>{{ v.vuln_status|replace("_", " ")|capitalize }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>No vulnerabilities match the selected filters.</p>
+  {% endif %}
+</div>
+<div class="page-break">
+  <h2>Detailed Findings</h2>
+  {% for v in vulnerabilities %}
+  <div class="vuln-card">
+    <div class="vuln-card-header">
+      <strong>{{ loop.index }}. {{ v.title }}</strong>
+      &nbsp;
+      <span class="badge badge-{{ v.risk_level }}">{{ v.risk_level|upper }}</span>
+      {% if v.is_recurring %}<span class="badge badge-recurring">RECURRING</span>{% endif %}
+      {% if v.cve_id %}<span style="font-size:9pt;color:#6b7280;margin-left:8px;">{{ v.cve_id }}</span>{% endif %}
+    </div>
+    <div class="vuln-card-body">
+      <div class="vuln-meta">
+        {% if v.affected_host    %}<span><strong>Host:</strong> {{ v.affected_host }}</span>{% endif %}
+        {% if v.affected_port    %}<span><strong>Port:</strong> {{ v.affected_port }}</span>{% endif %}
+        {% if v.affected_service %}<span><strong>Service:</strong> {{ v.affected_service }}</span>{% endif %}
+        {% if audience != 'executive' %}
+          {% if v.cvss_score is not none %}<span><strong>CVSS:</strong> <span style="color:{{ v.cvss_score|cvss_color }}">{{ "%.1f"|format(v.cvss_score) }}</span></span>{% endif %}
+          {% if v.epss_score is not none %}<span><strong>EPSS:</strong> {{ "%.2f%%"|format(v.epss_score * 100) }}</span>{% endif %}
+        {% endif %}
+        {% if v.sources %}<span><strong>Detected by:</strong> {{ v.sources|join(", ") }}</span>{% endif %}
+      </div>
+      {% if v.description %}
+      <h3>Description</h3>
+      <p>{{ v.description }}</p>
+      {% endif %}
+      {% if v.remediation %}
+      <h3>Remediation</h3>
+      <p>{{ v.remediation }}</p>
+      {% endif %}
+      {% if v.evidence_code and audience == 'technical' %}
+      <h3>Evidence</h3>
+      <div class="evidence-{{ rpt_style.evidence_style }}">{{ v.evidence_code[:2000] }}</div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+
+{# ── Host Breakdown ── #}
+{% macro mac_host_breakdown() %}
+{% if hosts %}
+<div class="page-break">
+  <h2>Host Breakdown</h2>
+  {{ _ci('host_breakdown') }}
+  {% for host_name, host_vulns in hosts.items() %}
+  <div class="host-section">
+    <div class="host-title">{{ host_name }} — {{ host_vulns|length }} finding{{ "s" if host_vulns|length != 1 else "" }}</div>
+    <table class="vuln-table">
+      <thead>
+        <tr><th>#</th><th>Title</th><th>Port</th><th>Severity</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+        {% for v in host_vulns %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ v.title }}</td>
+          <td>{{ v.affected_port or "—" }}</td>
+          <td><span class="badge badge-{{ v.risk_level }}">{{ v.risk_level|upper }}</span></td>
+          <td>{{ v.vuln_status|replace("_", " ")|capitalize }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endmacro %}
+
+
+{# ── Remediation Plan ── #}
+{% macro mac_remediation_plan() %}
+<div class="page-break">
+  <h2>Remediation Plan</h2>
+  {{ _ci('remediation_plan') }}
+  <p>The following table summarizes recommended actions, ordered by priority.</p>
+  {% if vulnerabilities %}
+  <table class="rem-table">
+    <thead>
+      <tr>
+        <th>Priority</th><th>Vulnerability</th><th>Host</th>
+        <th>Severity</th><th>Recommended Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for v in vulnerabilities %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td>{{ v.title }}{% if v.cve_id %} <em>({{ v.cve_id }})</em>{% endif %}</td>
+        <td>{{ v.affected_host or "—" }}</td>
+        <td><span class="badge badge-{{ v.risk_level }}">{{ v.risk_level|upper }}</span></td>
+        <td>{{ v.remediation or "See detailed findings." }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>No vulnerabilities match the selected filters.</p>
+  {% endif %}
+</div>
+{% endmacro %}

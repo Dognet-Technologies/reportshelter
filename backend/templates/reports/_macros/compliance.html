@@ -1,0 +1,148 @@
+{# ================================================================
+   COMPLIANCE / FRAMEWORK MACROS
+   Covers: risk_register, compliance_matrix, owasp_coverage,
+           masvs_coverage, mitre_mapping, detection_gap
+   ================================================================ #}
+
+{# ── Risk Register ── #}
+{% macro mac_risk_register() %}
+<div class="page-break">
+  <h2>Risk Register</h2>
+  {{ _ci('risk_register') }}
+  <p>Risk catalog with risk acceptance decisions.</p>
+  <p style="color:#6b7280;font-style:italic;">No risk register entries for this sub-project.</p>
+</div>
+{% endmacro %}
+
+
+{# ── Compliance Matrix ── #}
+{% macro mac_compliance_matrix() %}
+<div class="page-break">
+  <h2>Compliance Matrix</h2>
+  {{ _ci('compliance_matrix') }}
+  <p>Control-by-control compliance status.</p>
+  <p style="color:#6b7280;font-style:italic;">No compliance matrix data for this sub-project.</p>
+</div>
+{% endmacro %}
+
+
+{# ── OWASP Coverage ── #}
+{% macro mac_owasp_coverage() %}
+<div class="page-break">
+  <h2>OWASP Coverage</h2>
+  {{ _ci('owasp_coverage') }}
+  <p>Mapping of findings to the OWASP Top 10 risk categories.</p>
+  {% if charts.vulns_by_category %}
+  <div class="chart-full" style="margin-bottom:16px;">
+    <img class="chart-img" src="data:image/png;base64,{{ charts.vulns_by_category }}" />
+  </div>
+  {% endif %}
+  <table class="vuln-table">
+    <thead><tr><th>#</th><th>OWASP Category</th><th>Findings</th></tr></thead>
+    <tbody>
+      {% for v in vulnerabilities if v.category %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td>{{ v.category }}</td>
+        <td>{{ v.title[:80] }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="3" style="color:#6b7280;font-style:italic;">No OWASP category data available. Ensure parsers populate the category field.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endmacro %}
+
+
+{# ── MASVS Coverage ── #}
+{% macro mac_masvs_coverage() %}
+<div class="page-break">
+  <h2>MASVS Coverage</h2>
+  {{ _ci('masvs_coverage') }}
+  <p>Mapping of findings to OWASP Mobile Application Security Verification Standard controls.</p>
+  {% if charts.vulns_by_category %}
+  <div class="chart-full" style="margin-bottom:16px;">
+    <img class="chart-img" src="data:image/png;base64,{{ charts.vulns_by_category }}" />
+  </div>
+  {% endif %}
+  <table class="vuln-table">
+    <thead><tr><th>#</th><th>MASVS Control</th><th>Finding</th><th>Severity</th></tr></thead>
+    <tbody>
+      {% for v in vulnerabilities if v.category %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td>{{ v.category }}</td>
+        <td>{{ v.title[:80] }}</td>
+        <td><span class="badge badge-{{ v.risk_level }}">{{ v.risk_level|upper }}</span></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" style="color:#6b7280;font-style:italic;">No MASVS category data available.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endmacro %}
+
+
+{# ── MITRE ATT&CK Mapping ── #}
+{% macro mac_mitre_mapping() %}
+<div class="page-break">
+  <h2>MITRE ATT&amp;CK Mapping</h2>
+  {{ _ci('mitre_mapping') }}
+  <p>
+    The following table maps findings to MITRE ATT&amp;CK tactics and techniques
+    to support threat modelling and detection engineering.
+  </p>
+  <table class="vuln-table">
+    <thead><tr><th>#</th><th>Finding</th><th>Tactic</th><th>Technique</th><th>Severity</th></tr></thead>
+    <tbody>
+      {% for v in vulnerabilities %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td>{{ v.title[:60] }}</td>
+        <td style="color:#6b7280;font-style:italic;">—</td>
+        <td style="color:#6b7280;font-style:italic;">—</td>
+        <td><span class="badge badge-{{ v.risk_level }}">{{ v.risk_level|upper }}</span></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" style="color:#6b7280;font-style:italic;">No findings available.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p style="color:#6b7280;font-size:8.5pt;margin-top:8px;">
+    MITRE technique mapping requires manual annotation by the assessor.
+  </p>
+</div>
+{% endmacro %}
+
+
+{# ── Detection Gap Analysis ── #}
+{% macro mac_detection_gap() %}
+<div class="page-break">
+  <h2>Detection Gap Analysis</h2>
+  {{ _ci('detection_gap') }}
+  <p>
+    This section highlights areas where the organization's detection and response
+    capabilities may be insufficient to identify or contain the identified threats.
+  </p>
+  <table class="vuln-table">
+    <thead><tr><th>#</th><th>Attack Technique</th><th>Detection Capability</th><th>Gap</th></tr></thead>
+    <tbody>
+      {% for v in vulnerabilities if v.risk_level in ['critical', 'high'] %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td>{{ v.title[:60] }}</td>
+        <td style="color:#6b7280;font-style:italic;">Unknown</td>
+        <td style="color:#dc2626;">Requires review</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" style="color:#6b7280;font-style:italic;">No critical/high findings requiring detection gap review.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p style="color:#6b7280;font-size:8.5pt;margin-top:8px;">
+    Detection gap assessment requires input from the client's SOC/detection engineering team.
+  </p>
+</div>
+{% endmacro %}

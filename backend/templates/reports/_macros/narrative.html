@@ -1,0 +1,155 @@
+{# ================================================================
+   NARRATIVE / ATTACK MACROS
+   Covers: attack_timeline, attack_narrative, attack_paths, ioc,
+           diff_retest, network_overview, cloud_posture_overview
+   ================================================================ #}
+
+{# ── Attack Timeline ── #}
+{% macro mac_attack_timeline() %}
+<div class="page-break">
+  <h2>Attack Timeline</h2>
+  {{ _ci('attack_timeline') }}
+  <p>Chronological narrative of attack steps and adversary activity during the engagement.</p>
+  <p style="color:#6b7280;font-style:italic;">No timeline data recorded for this sub-project.</p>
+</div>
+{% endmacro %}
+
+
+{# ── Attack Narrative ── #}
+{% macro mac_attack_narrative() %}
+<div class="page-break">
+  <h2>Attack Narrative</h2>
+  {{ _ci('attack_narrative') }}
+  <p>
+    This section describes the attack chain and exploitation path followed during the engagement,
+    from initial access through to the final objective.
+  </p>
+  <p style="color:#6b7280;font-style:italic;">
+    Detailed attack narrative to be completed by the assessor based on engagement notes.
+  </p>
+</div>
+{% endmacro %}
+
+
+{# ── Attack Paths ── #}
+{% macro mac_attack_paths() %}
+<div class="page-break">
+  <h2>Attack Paths</h2>
+  {{ _ci('attack_paths') }}
+  <p>
+    Potential and observed attack paths identified during the assessment,
+    including lateral movement vectors and privilege escalation routes.
+  </p>
+  {% if vulnerabilities %}
+  <table class="vuln-table">
+    <thead><tr><th>#</th><th>Entry Point</th><th>Pivot</th><th>Objective</th><th>Severity</th></tr></thead>
+    <tbody>
+      {% for v in vulnerabilities if v.risk_level in ['critical','high'] %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td>{{ v.affected_host or "—" }}{% if v.affected_port %}:{{ v.affected_port }}{% endif %}</td>
+        <td>{{ v.affected_service or "—" }}</td>
+        <td>{{ v.title[:60] }}</td>
+        <td><span class="badge badge-{{ v.risk_level }}">{{ v.risk_level|upper }}</span></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" style="color:#6b7280;font-style:italic;">No critical/high findings to display.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+{% endmacro %}
+
+
+{# ── Indicators of Compromise ── #}
+{% macro mac_ioc() %}
+<div class="page-break">
+  <h2>Indicators of Compromise</h2>
+  {{ _ci('ioc') }}
+  <p>IoCs, TTPs, threat indicators, and file hashes identified during the engagement.</p>
+  <p style="color:#6b7280;font-style:italic;">No IoC data recorded for this sub-project.</p>
+</div>
+{% endmacro %}
+
+
+{# ── Retest Comparison ── #}
+{% macro mac_diff_retest() %}
+<div class="page-break">
+  <h2>Retest Comparison</h2>
+  {{ _ci('diff_retest') }}
+  <p>Comparison of current findings against the previous assessment.</p>
+  {% if charts.fixed_vs_open %}
+  <div class="chart-full" style="margin-bottom:16px;">
+    <img class="chart-img" src="data:image/png;base64,{{ charts.fixed_vs_open }}" />
+  </div>
+  {% endif %}
+  <p style="color:#6b7280;font-style:italic;">No previous sub-project available for comparison.</p>
+</div>
+{% endmacro %}
+
+
+{# ── Network Overview ── #}
+{% macro mac_network_overview() %}
+<div class="page-break">
+  <h2>Network Overview</h2>
+  {{ _ci('network_overview') }}
+  <p>Summary of network assets, open services, and exposure identified during the assessment.</p>
+  {% if charts.bar %}
+  <div class="chart-full" style="margin-bottom:16px;">
+    <img class="chart-img" src="data:image/png;base64,{{ charts.bar }}" />
+  </div>
+  {% endif %}
+  {% if hosts %}
+  <h3>Discovered Hosts</h3>
+  <table class="vuln-table">
+    <thead><tr><th>Host</th><th>Total Findings</th><th>Critical</th><th>High</th></tr></thead>
+    <tbody>
+      {% for host_name, host_vulns in hosts.items() %}
+      <tr>
+        <td>{{ host_name }}</td>
+        <td>{{ host_vulns|length }}</td>
+        <td>{{ host_vulns|selectattr("risk_level", "equalto", "critical")|list|length }}</td>
+        <td>{{ host_vulns|selectattr("risk_level", "equalto", "high")|list|length }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+{% endmacro %}
+
+
+{# ── Cloud Posture Overview ── #}
+{% macro mac_cloud_posture_overview() %}
+<div class="page-break">
+  <h2>Cloud Posture Overview</h2>
+  {{ _ci('cloud_posture_overview') }}
+  <p>High-level assessment of cloud infrastructure security posture across assessed services.</p>
+  {% if vulnerabilities %}
+  <div class="chart-grid">
+    {% if charts.vulns_by_category %}
+    <div class="chart-full">
+      <img class="chart-img" src="data:image/png;base64,{{ charts.vulns_by_category }}" />
+    </div>
+    {% endif %}
+  </div>
+  <table class="vuln-table">
+    <thead><tr><th>#</th><th>Service / Resource</th><th>Finding</th><th>Severity</th><th>Status</th></tr></thead>
+    <tbody>
+      {% for v in vulnerabilities %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td>{{ v.affected_host or "—" }}</td>
+        <td>{{ v.title }}</td>
+        <td><span class="badge badge-{{ v.risk_level }}">{{ v.risk_level|upper }}</span></td>
+        <td>{{ v.vuln_status|replace("_", " ")|capitalize }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p style="color:#6b7280;font-style:italic;">No cloud posture findings recorded.</p>
+  {% endif %}
+</div>
+{% endmacro %}

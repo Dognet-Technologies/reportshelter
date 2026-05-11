@@ -1,0 +1,329 @@
+{# ================================================================
+   SUMMARY MACROS
+   Covers: toc, doc_control, executive_summary, risk_summary,
+   findings_summary, scope, engagement_overview, recommendations, appendix
+   All macros receive their data from the rendering context (imported
+   with context from base.html).  _ci() is a Python callable in context.
+   ================================================================ #}
+
+{# ── Table of Contents ── #}
+{% macro mac_toc() %}
+<div class="page-break">
+  <h2>Table of Contents</h2>
+  <ol style="margin-left:20px; line-height:2;">
+    {% for sid in ordered_sections %}
+      {% if   sid == 'doc_control'            %}<li>Document Control</li>
+      {% elif sid == 'executive_summary'      %}<li>Executive Summary</li>
+      {% elif sid == 'findings_summary'       %}<li>Findings Summary</li>
+      {% elif sid == 'risk_summary'           %}<li>Risk Summary</li>
+      {% elif sid == 'scope'                  %}<li>Scope &amp; Methodology</li>
+      {% elif sid == 'engagement_overview'    %}<li>Engagement Overview</li>
+      {% elif sid == 'vuln_details'           %}<li>Vulnerability Overview &amp; Detailed Findings</li>
+      {% elif sid == 'host_breakdown'         %}<li>Host Breakdown</li>
+      {% elif sid == 'remediation_plan'       %}<li>Remediation Plan</li>
+      {% elif sid == 'attack_timeline'        %}<li>Attack Timeline</li>
+      {% elif sid == 'attack_narrative'       %}<li>Attack Narrative</li>
+      {% elif sid == 'attack_paths'           %}<li>Attack Paths</li>
+      {% elif sid == 'ioc'                    %}<li>Indicators of Compromise</li>
+      {% elif sid == 'diff_retest'            %}<li>Retest Comparison</li>
+      {% elif sid == 'risk_register'          %}<li>Risk Register</li>
+      {% elif sid == 'compliance_matrix'      %}<li>Compliance Matrix</li>
+      {% elif sid == 'osint_findings'         %}<li>OSINT Findings</li>
+      {% elif sid == 'digital_footprint'      %}<li>Digital Footprint</li>
+      {% elif sid == 'credential_exposure'    %}<li>Credential Exposure</li>
+      {% elif sid == 'owasp_coverage'         %}<li>OWASP Coverage</li>
+      {% elif sid == 'masvs_coverage'         %}<li>MASVS Coverage</li>
+      {% elif sid == 'mitre_mapping'          %}<li>MITRE ATT&amp;CK Mapping</li>
+      {% elif sid == 'detection_gap'          %}<li>Detection Gap Analysis</li>
+      {% elif sid == 'cloud_posture_overview' %}<li>Cloud Posture Overview</li>
+      {% elif sid == 'network_overview'       %}<li>Network Overview</li>
+      {% elif sid == 'passive_recon'          %}<li>Passive Reconnaissance</li>
+      {% elif sid == 'web_surface'            %}<li>Web Attack Surface</li>
+      {% elif sid == 'content_discovery'      %}<li>Content Discovery</li>
+      {% elif sid == 'recommendations'        %}<li>Recommendations</li>
+      {% elif sid == 'appendix'               %}<li>Appendices</li>
+      {% endif %}
+    {% endfor %}
+  </ol>
+</div>
+{% endmacro %}
+
+
+{# ── Document Control ── #}
+{% macro mac_doc_control() %}
+<div class="page-break">
+  <h2>Document Control</h2>
+  {{ _ci('doc_control') }}
+  <table class="vuln-table" style="width:60%;">
+    <thead><tr><th>Field</th><th>Value</th></tr></thead>
+    <tbody>
+      <tr><td>Classification</td><td>{{ rpt_extra.classification }}</td></tr>
+      <tr><td>Version</td><td>{{ rpt_extra.version }}</td></tr>
+      <tr><td>Prepared by</td><td>{{ rpt_extra.authors or org.name }}</td></tr>
+      <tr><td>Client</td><td>{{ project.client_name or "—" }}</td></tr>
+      <tr><td>Date</td><td>{{ subproject.scan_date|format_date if subproject.scan_date else now()|format_date }}</td></tr>
+    </tbody>
+  </table>
+</div>
+{% endmacro %}
+
+
+{# ── Executive Summary ── #}
+{% macro mac_executive_summary() %}
+<div class="page-break">
+  <h2>Executive Summary</h2>
+  {{ _ci('executive_summary') }}
+  <p>
+    This report presents the findings of the
+    <strong>{{ report_type_label }}</strong> conducted on
+    <strong>{{ project.client_name or "the target organization" }}</strong>.
+    The assessment covered <em>{{ subproject.title }}</em> and identified
+    <strong>{{ vulnerabilities|length }}</strong> vulnerabilit{{ "y" if vulnerabilities|length == 1 else "ies" }}.
+  </p>
+  <div class="kpi-row">
+    <div class="kpi-box">
+      <div class="kpi-number">{{ vulnerabilities|length }}</div>
+      <div class="kpi-label">Total</div>
+    </div>
+    {% for level in ["critical", "high", "medium", "low", "info"] %}
+    <div class="kpi-box {{ level }}">
+      <div class="kpi-number">{{ severity_counts.get(level, 0) }}</div>
+      <div class="kpi-label">{{ level|capitalize }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% if 'risk_summary' in sections %}
+  <div class="chart-grid">
+    {% if charts.pie %}
+    <div class="chart-half">
+      <img class="chart-img" src="data:image/png;base64,{{ charts.pie }}" />
+    </div>
+    {% endif %}
+    {% if charts.bar %}
+    <div class="chart-half">
+      <img class="chart-img" src="data:image/png;base64,{{ charts.bar }}" />
+    </div>
+    {% endif %}
+  </div>
+  {% if charts.risk_matrix %}
+  <div class="chart-full">
+    <img class="chart-img" src="data:image/png;base64,{{ charts.risk_matrix }}" />
+  </div>
+  {% endif %}
+  <div class="chart-grid">
+    {% if charts.risk_gauge %}
+    <div class="chart-half">
+      <img class="chart-img" src="data:image/png;base64,{{ charts.risk_gauge }}" />
+    </div>
+    {% endif %}
+    {% if charts.fixed_vs_open %}
+    <div class="chart-half">
+      <img class="chart-img" src="data:image/png;base64,{{ charts.fixed_vs_open }}" />
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endmacro %}
+
+
+{# ── Risk Summary (standalone — only when executive_summary is not present) ── #}
+{% macro mac_risk_summary() %}
+{% if 'executive_summary' not in sections %}
+<div class="page-break">
+  <h2>Risk Summary</h2>
+  {{ _ci('risk_summary') }}
+  <div class="kpi-row">
+    <div class="kpi-box">
+      <div class="kpi-number">{{ vulnerabilities|length }}</div>
+      <div class="kpi-label">Total</div>
+    </div>
+    {% for level in ["critical", "high", "medium", "low", "info"] %}
+    <div class="kpi-box {{ level }}">
+      <div class="kpi-number">{{ severity_counts.get(level, 0) }}</div>
+      <div class="kpi-label">{{ level|capitalize }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="chart-grid">
+    {% if charts.pie %}
+    <div class="chart-half">
+      <img class="chart-img" src="data:image/png;base64,{{ charts.pie }}" />
+    </div>
+    {% endif %}
+    {% if charts.bar %}
+    <div class="chart-half">
+      <img class="chart-img" src="data:image/png;base64,{{ charts.bar }}" />
+    </div>
+    {% endif %}
+  </div>
+  {% if charts.risk_matrix %}
+  <div class="chart-full">
+    <img class="chart-img" src="data:image/png;base64,{{ charts.risk_matrix }}" />
+  </div>
+  {% endif %}
+  <div class="chart-grid">
+    {% if charts.risk_gauge %}
+    <div class="chart-half">
+      <img class="chart-img" src="data:image/png;base64,{{ charts.risk_gauge }}" />
+    </div>
+    {% endif %}
+    {% if charts.fixed_vs_open %}
+    <div class="chart-half">
+      <img class="chart-img" src="data:image/png;base64,{{ charts.fixed_vs_open }}" />
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+{% endmacro %}
+
+
+{# ── Findings Summary ── #}
+{% macro mac_findings_summary() %}
+<div class="page-break">
+  <h2>Findings Summary</h2>
+  {{ _ci('findings_summary') }}
+  <div class="kpi-row">
+    <div class="kpi-box">
+      <div class="kpi-number">{{ vulnerabilities|length }}</div>
+      <div class="kpi-label">Total</div>
+    </div>
+    {% for level in ["critical", "high", "medium", "low", "info"] %}
+    <div class="kpi-box {{ level }}">
+      <div class="kpi-number">{{ severity_counts.get(level, 0) }}</div>
+      <div class="kpi-label">{{ level|capitalize }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="chart-grid">
+    {% if charts.pie %}
+    <div class="chart-half">
+      <img class="chart-img" src="data:image/png;base64,{{ charts.pie }}" />
+    </div>
+    {% endif %}
+    {% if charts.risk_gauge %}
+    <div class="chart-half">
+      <img class="chart-img" src="data:image/png;base64,{{ charts.risk_gauge }}" />
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endmacro %}
+
+
+{# ── Scope & Methodology ── #}
+{% macro mac_scope() %}
+<div class="page-break">
+  <h2>Scope &amp; Methodology</h2>
+  {{ _ci('scope') }}
+  <h3>Scope</h3>
+  {% if rpt_extra.scope %}
+  <p>{{ rpt_extra.scope }}</p>
+  {% elif subproject.description %}
+  <p>{{ subproject.description }}</p>
+  {% else %}
+  <p>
+    The scope of this assessment encompassed the systems and services associated with
+    <strong>{{ project.client_name or "the client" }}</strong> as defined during the
+    pre-engagement phase.
+  </p>
+  {% endif %}
+  {% if rpt_extra.engagement_type %}
+  <p><strong>Engagement type:</strong> {{ rpt_extra.engagement_type|replace("_", " ")|capitalize }}</p>
+  {% endif %}
+  <h3>Methodology</h3>
+  {% if rpt_extra.methodologies %}
+  <p>
+    The assessment was conducted using industry-standard methodologies including:
+    <strong>{{ rpt_extra.methodologies|join(", ") }}</strong>.
+  </p>
+  {% else %}
+  <p>
+    The assessment was conducted using industry-standard tools and methodologies
+    aligned with the OWASP Testing Guide and PTES
+    (Penetration Testing Execution Standard).
+  </p>
+  {% endif %}
+</div>
+{% endmacro %}
+
+
+{# ── Engagement Overview ── #}
+{% macro mac_engagement_overview() %}
+<div class="page-break">
+  <h2>Engagement Overview</h2>
+  {{ _ci('engagement_overview') }}
+  <table class="vuln-table" style="width:70%;">
+    <thead><tr><th>Parameter</th><th>Value</th></tr></thead>
+    <tbody>
+      <tr><td>Engagement Type</td><td>{{ rpt_extra.engagement_type|replace("_"," ")|capitalize or "—" }}</td></tr>
+      <tr><td>Target</td><td>{{ project.client_name or "—" }}</td></tr>
+      <tr><td>Assessment Period</td><td>{{ subproject.scan_date|format_date if subproject.scan_date else "—" }}</td></tr>
+      <tr><td>Scope</td><td>{{ rpt_extra.scope or "See Scope section." }}</td></tr>
+      <tr><td>Methodology</td><td>{{ rpt_extra.methodologies|join(", ") if rpt_extra.methodologies else "PTES / OWASP" }}</td></tr>
+      <tr><td>Report Version</td><td>{{ rpt_extra.version }}</td></tr>
+    </tbody>
+  </table>
+</div>
+{% endmacro %}
+
+
+{# ── Recommendations ── #}
+{% macro mac_recommendations() %}
+<div class="page-break">
+  <h2>Recommendations</h2>
+  {{ _ci('recommendations') }}
+  <p>
+    Based on the findings of this assessment, the following strategic recommendations
+    are provided to improve the overall security posture of
+    <strong>{{ project.client_name or "the organization" }}</strong>.
+  </p>
+  <ol style="margin-left:20px; line-height:2;">
+    {% if severity_counts.get('critical', 0) > 0 or severity_counts.get('high', 0) > 0 %}
+    <li>Prioritize remediation of Critical and High severity vulnerabilities immediately.</li>
+    {% endif %}
+    <li>Establish a patch management process to keep systems up to date.</li>
+    <li>Implement continuous security monitoring and periodic assessments.</li>
+    <li>Conduct security awareness training for staff.</li>
+    <li>Review and enforce the principle of least privilege across all systems.</li>
+  </ol>
+</div>
+{% endmacro %}
+
+
+{# ── Appendix ── #}
+{% macro mac_appendix() %}
+<div class="page-break">
+  <h2>Appendices</h2>
+  {{ _ci('appendix') }}
+
+  {% if charts.timeline %}
+  <h3>Vulnerability Timeline</h3>
+  <img class="chart-img" src="data:image/png;base64,{{ charts.timeline }}" />
+  {% endif %}
+
+  <h3>Methodology</h3>
+  {% if rpt_extra.methodologies %}
+  <p>
+    This assessment used the following methodologies:
+    <strong>{{ rpt_extra.methodologies|join(", ") }}</strong>.
+  </p>
+  {% else %}
+  <p>
+    The assessment was conducted using industry-standard tools and methodologies
+    aligned with OWASP Testing Guide and PTES (Penetration Testing Execution Standard).
+  </p>
+  {% endif %}
+
+  {% if rpt_extra.references %}
+  <h3>References</h3>
+  <p>{{ rpt_extra.references }}</p>
+  {% endif %}
+
+  {% if org.legal_disclaimer %}
+  <h3>Legal Disclaimer</h3>
+  <p>{{ org.legal_disclaimer }}</p>
+  {% endif %}
+</div>
+{% endmacro %}
