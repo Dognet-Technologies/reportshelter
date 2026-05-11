@@ -59,14 +59,35 @@
 <div class="page-break">
   <h2>Document Control</h2>
   {{ _ci('doc_control') }}
-  <table class="vuln-table" style="width:60%;">
+  <table class="vuln-table" style="width:70%;">
     <thead><tr><th>Field</th><th>Value</th></tr></thead>
     <tbody>
       <tr><td>Classification</td><td>{{ rpt_extra.classification }}</td></tr>
+      {% if rpt_extra.confidence %}
+      <tr><td>Confidence</td><td>{{ rpt_extra.confidence }}</td></tr>
+      {% endif %}
+      <tr><td>Report Type</td><td>{{ report_type_label }}</td></tr>
+      {% if rpt_extra.report_id %}
+      <tr><td>Reference / ID</td><td>{{ rpt_extra.report_id }}</td></tr>
+      {% endif %}
       <tr><td>Version</td><td>{{ rpt_extra.version }}</td></tr>
-      <tr><td>Prepared by</td><td>{{ rpt_extra.authors or org.name }}</td></tr>
-      <tr><td>Client</td><td>{{ project.client_name or "—" }}</td></tr>
       <tr><td>Date</td><td>{{ subproject.scan_date|format_date if subproject.scan_date else now()|format_date }}</td></tr>
+      {% if rpt_extra.engagement_start or rpt_extra.engagement_end %}
+      <tr><td>Assessment period</td><td>{{ rpt_extra.engagement_start or "?" }} – {{ rpt_extra.engagement_end or "?" }}</td></tr>
+      {% endif %}
+      <tr><td>Prepared by</td><td>{{ rpt_extra.authors or org.name }}</td></tr>
+      {% if rpt_extra.reviewed_by %}
+      <tr><td>Reviewed by</td><td>{{ rpt_extra.reviewed_by }}</td></tr>
+      {% endif %}
+      <tr><td>Client</td><td>{{ project.client_name or "—" }}</td></tr>
+      {% if project.client_contact %}
+      <tr><td>Client contact</td><td>{{ project.client_contact }}{% if project.client_email %} &lt;{{ project.client_email }}&gt;{% endif %}{% if project.client_phone %} · {{ project.client_phone }}{% endif %}</td></tr>
+      {% elif project.client_email %}
+      <tr><td>Client email</td><td>{{ project.client_email }}</td></tr>
+      {% endif %}
+      {% if rpt_extra.recipients %}
+      <tr><td>Distribution</td><td>{{ rpt_extra.recipients }}</td></tr>
+      {% endif %}
     </tbody>
   </table>
 </div>
@@ -375,10 +396,29 @@
     <tbody>
       <tr><td>Engagement Type</td><td>{{ rpt_extra.engagement_type|replace("_"," ")|capitalize or "—" }}</td></tr>
       <tr><td>Target</td><td>{{ project.client_name or "—" }}</td></tr>
-      <tr><td>Assessment Period</td><td>{{ subproject.scan_date|format_date if subproject.scan_date else "—" }}</td></tr>
-      <tr><td>Scope</td><td>{{ rpt_extra.scope or "See Scope section." }}</td></tr>
+      {% if project.client_contact %}
+      <tr><td>Client Contact</td><td>{{ project.client_contact }}{% if project.client_email %} &lt;{{ project.client_email }}&gt;{% endif %}{% if project.client_phone %} · {{ project.client_phone }}{% endif %}</td></tr>
+      {% elif project.client_email %}
+      <tr><td>Client Email</td><td>{{ project.client_email }}</td></tr>
+      {% endif %}
+      {% if rpt_extra.engagement_start or rpt_extra.engagement_end %}
+      <tr><td>Assessment Period</td><td>{{ rpt_extra.engagement_start or "?" }} – {{ rpt_extra.engagement_end or "?" }}</td></tr>
+      {% else %}
+      <tr><td>Assessment Date</td><td>{{ subproject.scan_date|format_date if subproject.scan_date else "—" }}</td></tr>
+      {% endif %}
+      <tr><td>Scope</td><td>{{ rpt_extra.scope or "See Scope &amp; Methodology section." }}</td></tr>
       <tr><td>Methodology</td><td>{{ rpt_extra.methodologies|join(", ") if rpt_extra.methodologies else "PTES / OWASP" }}</td></tr>
-      <tr><td>Report Version</td><td>{{ rpt_extra.version }}</td></tr>
+      {% if rpt_extra.confidence %}
+      <tr><td>Confidence</td><td>{{ rpt_extra.confidence }}</td></tr>
+      {% endif %}
+      <tr><td>Report Version</td><td>{{ rpt_extra.version }}{% if rpt_extra.report_id %} (Ref: {{ rpt_extra.report_id }}){% endif %}</td></tr>
+      <tr><td>Prepared by</td><td>{{ rpt_extra.authors or org.name }}</td></tr>
+      {% if rpt_extra.reviewed_by %}
+      <tr><td>Reviewed by</td><td>{{ rpt_extra.reviewed_by }}</td></tr>
+      {% endif %}
+      {% if rpt_extra.recipients %}
+      <tr><td>Distribution</td><td>{{ rpt_extra.recipients }}</td></tr>
+      {% endif %}
     </tbody>
   </table>
 </div>

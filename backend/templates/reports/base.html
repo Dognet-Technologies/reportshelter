@@ -329,7 +329,7 @@
 
   <!-- Running footer -->
   <div id="running-footer">
-    <span class="footer-left">{{ project.footer_text }}</span>
+    <span class="footer-left">{{ rpt_extra.footer_override or project.footer_text }}</span>
     <span class="footer-right"><span class="page-number"></span></span>
   </div>
 
@@ -346,10 +346,16 @@
     <div class="cover-line"></div>
     <div class="cover-meta">
       <strong>Client:</strong> {{ project.client_name or "—" }}<br/>
-      {% if project.client_contact %}<strong>Contact:</strong> {{ project.client_contact }}<br/>{% endif %}
+      {% if project.client_contact %}<strong>Contact:</strong> {{ project.client_contact }}{% if project.client_email %} &lt;{{ project.client_email }}&gt;{% endif %}{% if project.client_phone %} · {{ project.client_phone }}{% endif %}<br/>{% elif project.client_email %}<strong>Client email:</strong> {{ project.client_email }}<br/>{% endif %}
       <strong>Date:</strong> {{ subproject.scan_date|format_date if subproject.scan_date else now()|format_date }}<br/>
-      <strong>Version:</strong> {{ rpt_extra.version }}<br/>
+      {% if rpt_extra.engagement_start or rpt_extra.engagement_end %}
+      <strong>Assessment period:</strong>
+        {{ rpt_extra.engagement_start or "?" }} – {{ rpt_extra.engagement_end or "?" }}<br/>
+      {% endif %}
+      <strong>Version:</strong> {{ rpt_extra.version }}{% if rpt_extra.report_id %} &nbsp;|&nbsp; <strong>Ref:</strong> {{ rpt_extra.report_id }}{% endif %}<br/>
+      {% if rpt_extra.confidence %}<strong>Confidence:</strong> {{ rpt_extra.confidence }}<br/>{% endif %}
       {% if rpt_extra.authors %}<strong>Authors:</strong> {{ rpt_extra.authors }}<br/>{% endif %}
+      {% if rpt_extra.recipients %}<strong>Distribution:</strong> {{ rpt_extra.recipients }}<br/>{% endif %}
       <strong>Prepared by:</strong> {{ org.name }}
     </div>
 

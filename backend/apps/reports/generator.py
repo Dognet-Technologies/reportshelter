@@ -527,13 +527,24 @@ class ReportGenerator:
         """Return the per-report extra metadata dict."""
         e = self.options.get("extra") or {}
         return {
-            "classification":  e.get("classification", "CONFIDENTIAL"),
-            "version":         e.get("version", "1.0"),
-            "scope":           e.get("scope", ""),
-            "engagement_type": e.get("engagement_type", ""),
-            "methodologies":   e.get("methodologies") or [],
-            "authors":         e.get("authors", ""),
-            "references":      e.get("references", ""),
+            # Identity & classification
+            "classification":    e.get("classification", "CONFIDENTIAL"),
+            "confidence":        e.get("confidence", ""),          # High / Medium / Low
+            "version":           e.get("version", "1.0"),
+            "report_id":         e.get("report_id", ""),           # tracking/reference number
+            # Engagement scope
+            "scope":             e.get("scope", ""),
+            "engagement_type":   e.get("engagement_type", ""),
+            "engagement_start":  e.get("engagement_start", ""),    # ISO date string
+            "engagement_end":    e.get("engagement_end", ""),      # ISO date string
+            "methodologies":     e.get("methodologies") or [],
+            # People
+            "authors":           e.get("authors", ""),             # comma-separated names
+            "reviewed_by":       e.get("reviewed_by", ""),         # reviewer name
+            "recipients":        e.get("recipients", ""),          # distribution list
+            # References & footer
+            "references":        e.get("references", ""),
+            "footer_override":   e.get("footer_override", ""),     # overrides project.footer_text
         }
 
     def _build_charts(
