@@ -516,11 +516,11 @@ class RiskEntry(models.Model):
     risk_level  = models.CharField(max_length=16, choices=RiskLevel.choices, default=RiskLevel.MEDIUM)
     likelihood  = models.IntegerField(
         null=True, blank=True,
-        validators=[models.MinValueValidator(1), models.MaxValueValidator(5)],
+        validators=[MinValueValidator(1), MaxValueValidator(5)],
     )
     impact      = models.IntegerField(
         null=True, blank=True,
-        validators=[models.MinValueValidator(1), models.MaxValueValidator(5)],
+        validators=[MinValueValidator(1), MaxValueValidator(5)],
     )
     status      = models.CharField(max_length=16, choices=RiskStatus.choices, default=RiskStatus.OPEN)
     owner       = models.CharField(max_length=255, blank=True)
