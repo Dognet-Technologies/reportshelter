@@ -1,8 +1,8 @@
 # Django core
-Django==6.0.4
+Django==6.0.7
 djangorestframework==3.17.1
 django-cors-headers==4.9.0
-django-filter==25.2
+django-filter==26.1
 
 # Authentication & Security
 djangorestframework-simplejwt==5.5.1
@@ -42,7 +42,7 @@ pandas==3.0.2
 kaleido==1.2.0
 
 # Email
-django-anymail==15.0
+django-anymail==15.1
 
 # Utils
 python-decouple==3.8
